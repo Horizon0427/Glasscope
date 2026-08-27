@@ -1,0 +1,244 @@
+#ifdef GLASSCOPE_PLUGIN
+in vec2 vUv;
+uniform sampler2D uTexture;
+out vec4 outColor;
+#else
+in vec2 fragTexCoord;
+in vec4 fragColor;
+uniform sampler2D texture0;
+out vec4 finalColor;
+#define vUv fragTexCoord
+#define uTexture texture0
+#define outColor finalColor
+#endif
+
+uniform vec2  uResolution;
+uniform vec2  uTextureMax;
+uniform vec2  uCenter;
+uniform vec2  uVelocity;
+uniform vec2  uTrailNodes[3];
+uniform float uRadiusPx;
+uniform float uZoom;
+uniform float uTime;
+uniform float uStrength;
+uniform float uDispersion;
+uniform float uReveal;
+uniform float uWobble;
+uniform float uMotionStrength;
+uniform float uBulge;
+uniform float uEdgeWidthPx;
+uniform float uEdgeStrength;
+
+#ifndef GLASSCOPE_BEZIER_SAMPLES
+#define GLASSCOPE_BEZIER_SAMPLES 12
+#endif
+
+float smoothMinimum(float a, float b, float radius) {
+    float blend = clamp(0.5 + 0.5 * (b - a) / radius, 0.0, 1.0);
+    return mix(b, a, blend) - radius * blend * (1.0 - blend);
+}
+
+float circleDistance(vec2 point, vec2 center, float radius) {
+    return length(point - center) - radius;
+}
+
+vec2 cubicBezierPoint(vec2 control[4], float amount) {
+    float inverse = 1.0 - amount;
+    return control[0] * inverse * inverse * inverse +
+           control[1] * 3.0 * inverse * inverse * amount +
+           control[2] * 3.0 * inverse * amount * amount +
+           control[3] * amount * amount * amount;
+}
+
+vec2 cubicBezierDerivative(vec2 control[4], float amount) {
+    float inverse = 1.0 - amount;
+    return (control[1] - control[0]) * 3.0 * inverse * inverse +
+           (control[2] - control[1]) * 6.0 * inverse * amount +
+           (control[3] - control[2]) * 3.0 * amount * amount;
+}
+
+float perceptualLuminance(vec3 color) {
+    return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 preserveLuminance(vec3 color, float targetLuminance) {
+    float difference = targetLuminance - perceptualLuminance(color);
+    return clamp(color + vec3(difference), 0.0, 1.0);
+}
+
+void prepareLens(out float motionStrength, out float rawSpeed,
+                 out float signedBounce, out float radius,
+                 out vec2 nodes[4], out float maximumTrailLength) {
+    motionStrength = clamp(uMotionStrength, 0.0, 2.5);
+    rawSpeed = length(uVelocity);
+    signedBounce = clamp(uWobble, -1.0, 1.0);
+    float bounceScale = 1.0 + signedBounce * motionStrength * 0.020;
+    radius = uRadiusPx * mix(0.82, 1.0, uReveal) * bounceScale;
+
+    nodes[0] = vec2(0.0);
+    nodes[1] = uTrailNodes[0] * motionStrength;
+    nodes[2] = uTrailNodes[1] * motionStrength;
+    nodes[3] = uTrailNodes[2] * motionStrength;
+
+    maximumTrailLength = max(length(nodes[1]),
+                             max(length(nodes[2]), length(nodes[3])));
+    float maximumAllowedLength = radius * 1.35;
+    if (maximumTrailLength > maximumAllowedLength) {
+        float trailScale = maximumAllowedLength / maximumTrailLength;
+        nodes[1] *= trailScale;
+        nodes[2] *= trailScale;
+        nodes[3] *= trailScale;
+        maximumTrailLength = maximumAllowedLength;
+    }
+}
+
+float lensDistance(vec2 point, float motionStrength, float rawSpeed,
+                   float signedBounce, float radius, vec2 nodes[4],
+                   float maximumTrailLength) {
+    float speed = clamp(rawSpeed * motionStrength, 0.0, 1.18);
+
+    float normalizedTrail = maximumTrailLength / max(radius, 1.0);
+    float trailActivation = 1.0 - exp(-normalizedTrail * 3.8);
+    vec2 direction = length(nodes[1]) > 0.5 ? normalize(-nodes[1]) :
+                     (rawSpeed > 0.0001 ? normalize(uVelocity) :
+                                          vec2(1.0, 0.0));
+    vec2 perpendicular = vec2(-direction.y, direction.x);
+    float along = dot(point, direction);
+    float across = dot(point, perpendicular);
+    float restDrop = circleDistance(point, vec2(0.0), radius);
+
+    float distance = restDrop;
+    if (trailActivation > 0.0005) {
+        float slimeDrop = 100000.0;
+        int sampleCount = GLASSCOPE_BEZIER_SAMPLES;
+        for (int index = 0; index < GLASSCOPE_BEZIER_SAMPLES; ++index) {
+            float amount = float(index) / float(sampleCount - 1);
+            vec2 materialPoint = cubicBezierPoint(nodes, amount);
+            float localStretch = length(cubicBezierDerivative(nodes, amount)) /
+                                 max(radius * 1.45, 1.0);
+            float materialRadius = radius * clamp(
+                0.22 + 0.76 / (1.0 + localStretch * 0.98),
+                0.22, 0.96);
+            float sampleDrop = circleDistance(point, materialPoint,
+                                              materialRadius);
+            slimeDrop = smoothMinimum(slimeDrop, sampleDrop,
+                                      radius * 0.065);
+        }
+        distance = mix(restDrop, slimeDrop, trailActivation);
+    }
+
+    float surfaceEnergy = clamp(speed + trailActivation * 0.28 +
+                                abs(uWobble) * motionStrength * 0.34,
+                                0.0, 1.35);
+    float axisAngle = atan(across, along);
+    float flowRipple = sin(axisAngle * 3.0 + along / radius * 1.7 -
+                           uTime * 5.2) * 0.008 +
+                       sin(axisAngle * 5.0 + uTime * 3.8) * 0.004;
+    distance -= radius * flowRipple * surfaceEnergy;
+
+    float stopMode = cos(axisAngle * 2.0) * 0.033 +
+                     sin(axisAngle * 3.0 + 0.65) * 0.012;
+    distance -= radius * signedBounce * motionStrength * stopMode;
+    return distance;
+}
+
+vec2 safeUv(vec2 uv) {
+    vec2 texel = 1.5 / uResolution;
+    return clamp(uv, texel, uTextureMax - texel);
+}
+
+void main() {
+    vec2 pixelPoint = (vUv - uCenter) * uResolution;
+    float motionStrength;
+    float rawSpeed;
+    float signedBounce;
+    float radius;
+    float maximumTrailLength;
+    vec2 nodes[4];
+    prepareLens(motionStrength, rawSpeed, signedBounce, radius, nodes,
+                maximumTrailLength);
+
+    float conservativeOuterRadius = maximumTrailLength + radius * 1.20 + 2.0;
+    if (length(pixelPoint) > conservativeOuterRadius) {
+        outColor = vec4(0.0);
+        return;
+    }
+
+    float distance = lensDistance(pixelPoint, motionStrength, rawSpeed,
+                                  signedBounce, radius, nodes,
+                                  maximumTrailLength);
+
+    vec2 normal = normalize(vec2(dFdx(distance), dFdy(distance)) +
+                            vec2(0.000001));
+
+    float antialias = 1.75;
+    float mask = 1.0 - smoothstep(-antialias, antialias, distance);
+    float edgeWidth = max(uEdgeWidthPx, 4.0);
+    float rimWide = 1.0 - smoothstep(0.5, edgeWidth, abs(distance));
+    float rimCore = 1.0 - smoothstep(0.25, max(2.0, edgeWidth * 0.20),
+                                      abs(distance));
+    float innerShell = smoothstep(-edgeWidth * 1.55,
+                                  -edgeWidth * 0.16, distance) *
+                       (1.0 - smoothstep(-edgeWidth * 0.04,
+                                         edgeWidth * 0.28, distance));
+
+    float revealRadius = uRadiusPx * mix(0.82, 1.0, uReveal);
+    float radial = clamp(length(pixelPoint) / max(revealRadius, 1.0),
+                         0.0, 1.0);
+    float dome = 1.0 - radial * radial;
+    float domeScale = 1.0 - clamp(uBulge, 0.0, 0.28) * dome;
+    vec2 magnifiedUv = uCenter +
+                       (vUv - uCenter) / max(uZoom, 1.0) * domeScale;
+
+    float centerSafety = smoothstep(0.035, 0.16, radial);
+    float edgeRefraction = (rimWide * 9.0 + rimCore * 8.0 +
+                            innerShell * 2.8) *
+                           uStrength * uEdgeStrength;
+    vec2 refraction = normal / uResolution * edgeRefraction * centerSafety;
+
+    vec2 tangent = vec2(-normal.y, normal.x);
+    float wave = sin(dot(pixelPoint, tangent) * 0.055 + uTime * 4.5);
+    refraction += tangent / uResolution * wave * abs(uWobble) * 2.8;
+
+    vec2 sampleUv = safeUv(magnifiedUv + refraction);
+    vec3 base = texture(uTexture, sampleUv).rgb;
+    float sourceLuminance = perceptualLuminance(base);
+
+    float spectralWidth = rimWide * 3.7 + rimCore * 2.6;
+    vec2 spectralOffset = normal / uResolution * spectralWidth *
+                          uDispersion * uEdgeStrength * centerSafety;
+    vec3 refracted = base;
+    if (uDispersion > 0.001 && spectralWidth > 0.001) {
+        refracted.r = texture(uTexture, safeUv(sampleUv + spectralOffset)).r;
+        refracted.b = texture(uTexture, safeUv(sampleUv - spectralOffset)).b;
+    }
+
+    vec3 mint = vec3(0.545, 0.890, 0.831);
+    vec3 lilac = vec3(0.804, 0.729, 1.000);
+    float tintPhase = 0.5 + 0.5 * sin(pixelPoint.x * 0.016 +
+                                      pixelPoint.y * 0.011 + uTime * 0.8);
+    vec3 tint = mix(mint, lilac, tintPhase);
+    tint = preserveLuminance(tint, sourceLuminance);
+    float glassTint = rimWide * 0.105 + innerShell * 0.055;
+    refracted = mix(refracted, tint,
+                    glassTint * uStrength * uEdgeStrength);
+    refracted = preserveLuminance(refracted, sourceLuminance);
+
+    vec2 lightDirection = normalize(vec2(-0.72, -0.55));
+    float lightFacing = max(dot(-normal, lightDirection), 0.0);
+    float highlight = pow(lightFacing, 4.0) *
+                      (rimCore * 0.75 + innerShell * 0.32);
+    float innerShade = pow(max(dot(normal, lightDirection), 0.0), 2.0) *
+                       innerShell;
+    refracted *= 1.0 - innerShade * 0.10 * uEdgeStrength;
+    refracted += vec3(0.91, 1.0, 0.98) * highlight *
+                 0.42 * uEdgeStrength;
+
+    float alpha = mask * uReveal;
+#ifdef GLASSCOPE_PLUGIN
+    vec4 result = vec4(refracted * alpha, alpha);
+#else
+    vec4 result = vec4(refracted, alpha) * fragColor;
+#endif
+    outColor = result;
+}

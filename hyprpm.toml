@@ -1,0 +1,12 @@
+[repository]
+name = "glasscope"
+authors = ["horizon"]
+commit_pins = []
+
+[glasscope]
+description = "An interactive liquid-glass magnifier for Hyprland"
+authors = ["horizon"]
+output = "dist/glasscope.so"
+build = [
+  "bash scripts/build-hyprpm.sh",
+]

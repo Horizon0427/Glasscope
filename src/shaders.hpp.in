@@ -1,0 +1,14 @@
+#pragma once
+
+#include <string_view>
+
+namespace Glasscope::Shaders {
+inline constexpr std::string_view VERTEX_BODY = R"GLASSCOPE_SHADER(
+@GLASSCOPE_VERTEX_SHADER_BODY@
+)GLASSCOPE_SHADER";
+
+inline constexpr std::string_view FRAGMENT_BODY = R"GLASSCOPE_SHADER(
+@GLASSCOPE_FRAGMENT_SHADER_BODY@
+)GLASSCOPE_SHADER";
+
+} // namespace Glasscope::Shaders
