@@ -35,4 +35,4 @@ struct Vec2 {
     return multiply(value, maximum / magnitude);
 }
 
-} // namespace Glasscope
+}

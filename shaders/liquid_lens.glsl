@@ -28,6 +28,16 @@ uniform float uMotionStrength;
 uniform float uBulge;
 uniform float uEdgeWidthPx;
 uniform float uEdgeStrength;
+uniform float uColorStrength;
+uniform float uColorWidthPx;
+uniform vec4  uTransmissionColor;
+uniform vec4  uRefractionColor;
+uniform vec4  uReflectionColor;
+uniform vec4  uHighlightColor;
+uniform float uScale;
+uniform float uColorProbeAmount;
+uniform float uColorProbeCaptured;
+uniform vec3  uColorProbeColor;
 
 #ifndef GLASSCOPE_BEZIER_SAMPLES
 #define GLASSCOPE_BEZIER_SAMPLES 12
@@ -64,6 +74,12 @@ float perceptualLuminance(vec3 color) {
 vec3 preserveLuminance(vec3 color, float targetLuminance) {
     float difference = targetLuminance - perceptualLuminance(color);
     return clamp(color + vec3(difference), 0.0, 1.0);
+}
+
+float roundedBoxDistance(vec2 point, vec2 halfSize, float radius) {
+    vec2 offset = abs(point) - halfSize + vec2(radius);
+    return min(max(offset.x, offset.y), 0.0) +
+           length(max(offset, vec2(0.0))) - radius;
 }
 
 void prepareLens(out float motionStrength, out float rawSpeed,
@@ -226,13 +242,88 @@ void main() {
 
     vec2 lightDirection = normalize(vec2(-0.72, -0.55));
     float lightFacing = max(dot(-normal, lightDirection), 0.0);
+    vec3 highlightColor = vec3(0.91, 1.0, 0.98);
+    float colorStrength = clamp(uColorStrength, 0.0, 1.0);
+    if (colorStrength > 0.0) {
+        float colorWidth = max(uColorWidthPx, 1.0);
+        float colorInner = smoothstep(-colorWidth * 1.55,
+                                      -colorWidth * 0.16, distance) *
+                           (1.0 - smoothstep(-colorWidth * 0.04,
+                                             colorWidth * 0.28, distance));
+        float colorGrazing = pow(clamp(1.0 + distance / (colorWidth * 1.55),
+                                       0.0, 1.0), 1.5);
+        float backFacing = max(dot(normal, lightDirection), 0.0);
+        vec3 absorption = 1.0 - clamp(uTransmissionColor.rgb, 0.0, 1.0);
+        refracted *= exp(-absorption * clamp(uTransmissionColor.a, 0.0, 1.0) *
+                         colorStrength * (0.08 + colorInner * 0.65));
+        float refractionAmount = colorInner * (0.55 + 0.45 * backFacing) *
+                                 clamp(uRefractionColor.a, 0.0, 1.0) *
+                                 uStrength * uEdgeStrength * 0.85;
+        refracted = mix(refracted, clamp(uRefractionColor.rgb, 0.0, 1.0),
+                        colorStrength * clamp(refractionAmount, 0.0, 0.45));
+        float reflectionAmount = colorGrazing * (0.10 + 0.38 * lightFacing * lightFacing) *
+                                 clamp(uReflectionColor.a, 0.0, 1.0) * uEdgeStrength;
+        refracted = mix(refracted, clamp(uReflectionColor.rgb, 0.0, 1.0),
+                        colorStrength * clamp(reflectionAmount, 0.0, 0.45));
+        highlightColor = mix(highlightColor, clamp(uHighlightColor.rgb, 0.0, 1.0),
+                             colorStrength * clamp(uHighlightColor.a, 0.0, 1.0));
+    }
     float highlight = pow(lightFacing, 4.0) *
                       (rimCore * 0.75 + innerShell * 0.32);
     float innerShade = pow(max(dot(normal, lightDirection), 0.0), 2.0) *
                        innerShell;
     refracted *= 1.0 - innerShade * 0.10 * uEdgeStrength;
-    refracted += vec3(0.91, 1.0, 0.98) * highlight *
+    refracted += highlightColor * highlight *
                  0.42 * uEdgeStrength;
+
+    float probeAmount = clamp(uColorProbeAmount, 0.0, 1.0);
+    if (probeAmount > 0.001) {
+        float probeScale = max(uScale, 0.25);
+        vec2 probePoint = pixelPoint / probeScale;
+        float horizontal =
+            (1.0 - smoothstep(0.55, 1.15, abs(probePoint.y))) *
+            smoothstep(3.8, 5.0, abs(probePoint.x)) *
+            (1.0 - smoothstep(12.0, 13.2, abs(probePoint.x)));
+        float vertical =
+            (1.0 - smoothstep(0.55, 1.15, abs(probePoint.x))) *
+            smoothstep(3.8, 5.0, abs(probePoint.y)) *
+            (1.0 - smoothstep(12.0, 13.2, abs(probePoint.y)));
+        float crosshair = max(horizontal, vertical);
+        float horizontalOutline =
+            (1.0 - smoothstep(1.15, 1.85, abs(probePoint.y))) *
+            smoothstep(3.1, 4.1, abs(probePoint.x)) *
+            (1.0 - smoothstep(12.8, 14.0, abs(probePoint.x)));
+        float verticalOutline =
+            (1.0 - smoothstep(1.15, 1.85, abs(probePoint.x))) *
+            smoothstep(3.1, 4.1, abs(probePoint.y)) *
+            (1.0 - smoothstep(12.8, 14.0, abs(probePoint.y)));
+        float crosshairOutline = max(horizontalOutline, verticalOutline);
+
+        vec3 liveProbeColor = texture(uTexture, safeUv(uCenter)).rgb;
+        vec3 probeColor = mix(liveProbeColor, uColorProbeColor,
+                              clamp(uColorProbeCaptured, 0.0, 1.0));
+        float probeLuminance = perceptualLuminance(probeColor);
+        vec3 ink = probeLuminance < 0.48 ? vec3(1.0) : vec3(0.04);
+        vec3 shadowInk = probeLuminance < 0.48 ? vec3(0.04) : vec3(1.0);
+
+        refracted = mix(refracted, shadowInk,
+                        crosshairOutline * probeAmount * 0.72);
+        refracted = mix(refracted, ink, crosshair * probeAmount);
+
+        float logicalRadius = radius / probeScale;
+        vec2 swatchPoint = probePoint - vec2(0.0, logicalRadius * 0.60);
+        float swatchOuter = 1.0 - smoothstep(
+            -0.4, 0.8,
+            roundedBoxDistance(swatchPoint, vec2(18.0, 9.0), 4.0));
+        float swatchInner = 1.0 - smoothstep(
+            -0.4, 0.8,
+            roundedBoxDistance(swatchPoint, vec2(15.0, 6.0), 2.5));
+        float swatchBorder = max(swatchOuter - swatchInner, 0.0);
+        refracted = mix(refracted, ink,
+                        swatchBorder * probeAmount * 0.86);
+        refracted = mix(refracted, probeColor,
+                        swatchInner * probeAmount);
+    }
 
     float alpha = mask * uReveal;
 #ifdef GLASSCOPE_PLUGIN

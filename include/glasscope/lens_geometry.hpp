@@ -14,4 +14,4 @@ struct LensGeometry {
 
 [[nodiscard]] double lensExtent(const LensGeometry& geometry) noexcept;
 
-} // namespace Glasscope
+}

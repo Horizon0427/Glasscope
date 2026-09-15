@@ -13,4 +13,4 @@ double lensExtent(const LensGeometry& geometry) noexcept {
     return geometry.radius + padding;
 }
 
-} // namespace Glasscope
+}

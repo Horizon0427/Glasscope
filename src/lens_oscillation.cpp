@@ -15,7 +15,7 @@ constexpr double STOP_BOUNCE_FREQUENCY = 31.0;
 constexpr double STOP_BOUNCE_DAMPING = 7.5;
 constexpr double STOP_BOUNCE_DURATION = 0.46;
 
-} // namespace
+}
 
 void LensOscillation::syncPointer(Vec2 cursor, double nowSeconds) {
     resetDynamics(cursor, nowSeconds);
@@ -83,4 +83,4 @@ void LensOscillation::resetDynamics(Vec2 cursor, double nowSeconds) {
     m_pending = false;
 }
 
-} // namespace Glasscope
+}

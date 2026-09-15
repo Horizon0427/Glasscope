@@ -38,6 +38,24 @@ int luaHide(lua_State*) {
     return 0;
 }
 
+int luaBeginColorProbe(lua_State*) {
+    if (g_plugin)
+        g_plugin->beginColorProbe();
+    return 0;
+}
+
+int luaPickColor(lua_State*) {
+    if (g_plugin)
+        g_plugin->pickColor();
+    return 0;
+}
+
+int luaCancelColorProbe(lua_State*) {
+    if (g_plugin)
+        g_plugin->cancelColorProbe();
+    return 0;
+}
+
 std::optional<float> luaDelta(lua_State* state) {
     if (lua_gettop(state) < 1 || lua_isnumber(state, 1) == 0)
         return std::nullopt;
@@ -88,9 +106,15 @@ void unregisterBindings(HANDLE handle) {
     HyprlandAPI::removeDispatcher(handle, "glasscope:toggle");
     HyprlandAPI::removeDispatcher(handle, "glasscope:show");
     HyprlandAPI::removeDispatcher(handle, "glasscope:hide");
+    HyprlandAPI::removeDispatcher(handle, "glasscope:begin-color-probe");
+    HyprlandAPI::removeDispatcher(handle, "glasscope:pick-color");
+    HyprlandAPI::removeDispatcher(handle, "glasscope:cancel-color-probe");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "toggle");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "show");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "hide");
+    HyprlandAPI::removeLuaFunction(handle, "glasscope", "begin_color_probe");
+    HyprlandAPI::removeLuaFunction(handle, "glasscope", "pick_color");
+    HyprlandAPI::removeLuaFunction(handle, "glasscope", "cancel_color_probe");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "adjust_zoom");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "adjust_radius");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "adjust_edge_width");
@@ -117,17 +141,35 @@ void registerBindings(HANDLE handle) {
             g_plugin->hide();
         return SDispatchResult{};
     });
+    addDispatcher("glasscope:begin-color-probe", [](const std::string&) {
+        if (g_plugin)
+            g_plugin->beginColorProbe();
+        return SDispatchResult{};
+    });
+    addDispatcher("glasscope:pick-color", [](const std::string&) {
+        if (g_plugin)
+            g_plugin->pickColor();
+        return SDispatchResult{};
+    });
+    addDispatcher("glasscope:cancel-color-probe", [](const std::string&) {
+        if (g_plugin)
+            g_plugin->cancelColorProbe();
+        return SDispatchResult{};
+    });
 
     if (!HyprlandAPI::addLuaFunction(handle, "glasscope", "toggle", luaToggle) ||
         !HyprlandAPI::addLuaFunction(handle, "glasscope", "show", luaShow) ||
         !HyprlandAPI::addLuaFunction(handle, "glasscope", "hide", luaHide) ||
+        !HyprlandAPI::addLuaFunction(handle, "glasscope", "begin_color_probe", luaBeginColorProbe) ||
+        !HyprlandAPI::addLuaFunction(handle, "glasscope", "pick_color", luaPickColor) ||
+        !HyprlandAPI::addLuaFunction(handle, "glasscope", "cancel_color_probe", luaCancelColorProbe) ||
         !HyprlandAPI::addLuaFunction(handle, "glasscope", "adjust_zoom", luaAdjustZoom) ||
         !HyprlandAPI::addLuaFunction(handle, "glasscope", "adjust_radius", luaAdjustRadius) ||
         !HyprlandAPI::addLuaFunction(handle, "glasscope", "adjust_edge_width", luaAdjustEdgeWidth))
         throw std::runtime_error("glasscope: failed to register Lua functions");
 }
 
-} // namespace
+}
 
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
     return HYPRLAND_API_VERSION;
@@ -169,7 +211,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         "glasscope",
         "An interactive liquid-glass magnifier for Hyprland",
         "horizon",
-        "0.5.0",
+        "0.6.0",
     };
 }
 

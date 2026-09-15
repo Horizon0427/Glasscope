@@ -90,4 +90,4 @@ class GLStateGuard {
     GLboolean m_cullEnabled = GL_FALSE;
 };
 
-} // namespace Glasscope
+}

@@ -11,4 +11,4 @@ inline constexpr std::string_view FRAGMENT_BODY = R"GLASSCOPE_SHADER(
 @GLASSCOPE_FRAGMENT_SHADER_BODY@
 )GLASSCOPE_SHADER";
 
-} // namespace Glasscope::Shaders
+}

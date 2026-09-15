@@ -5,16 +5,23 @@
 #include <GLES3/gl32.h>
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <string>
 
 namespace Glasscope {
 
+struct ColorSample {
+    std::uint8_t red = 0;
+    std::uint8_t green = 0;
+    std::uint8_t blue = 0;
+};
+
 struct LensRenderParams {
     int framebufferWidth = 0;
     int framebufferHeight = 0;
-    float centerX = 0.0F; // pixels from the left edge
-    float centerY = 0.0F; // pixels from the top edge
+    float centerX = 0.0F;
+    float centerY = 0.0F;
     float scale = 1.0F;
     LensStyle style;
     float timeSeconds = 0.0F;
@@ -23,6 +30,10 @@ struct LensRenderParams {
     std::array<float, 6> trailNodes = {};
     float reveal = 1.0F;
     float wobble = 0.0F;
+    float colorProbeAmount = 0.0F;
+    float colorProbeCaptured = 0.0F;
+    std::array<float, 3> colorProbeColor = {};
+    bool captureColor = false;
 };
 
 class LensRenderer {
@@ -34,6 +45,7 @@ class LensRenderer {
     LensRenderer& operator=(const LensRenderer&) = delete;
 
     bool draw(const LensRenderParams& params);
+    [[nodiscard]] std::optional<ColorSample> takeColorSample();
     void releaseCopyTexture();
     void destroy();
 
@@ -60,6 +72,16 @@ class LensRenderer {
         GLint bulge = -1;
         GLint edgeWidth = -1;
         GLint edgeStrength = -1;
+        GLint colorStrength = -1;
+        GLint colorWidth = -1;
+        GLint transmissionColor = -1;
+        GLint refractionColor = -1;
+        GLint reflectionColor = -1;
+        GLint highlightColor = -1;
+        GLint scale = -1;
+        GLint colorProbeAmount = -1;
+        GLint colorProbeCaptured = -1;
+        GLint colorProbeColor = -1;
     };
 
     bool initialize();
@@ -79,7 +101,8 @@ class LensRenderer {
     int m_maxTextureSize = 0;
     bool m_nearest = false;
 
+    std::optional<ColorSample> m_colorSample;
     std::optional<std::string> m_error;
 };
 
-} // namespace Glasscope
+}

@@ -17,6 +17,9 @@ class PluginRuntime {
     void toggle();
     void show();
     void hide();
+    void beginColorProbe();
+    void pickColor();
+    void cancelColorProbe();
     float adjustZoom(float delta);
     float adjustRadius(float delta);
     float adjustEdgeWidth(float delta);
@@ -27,4 +30,4 @@ class PluginRuntime {
     std::unique_ptr<Impl> m_impl;
 };
 
-} // namespace Glasscope
+}

@@ -4,6 +4,15 @@
 #include <stdexcept>
 
 namespace Glasscope {
+namespace {
+
+std::array<float, 4> colorChannels(Config::INTEGER value) {
+    const CHyprColor color{static_cast<uint64_t>(static_cast<uint32_t>(value))};
+    return {static_cast<float>(color.r), static_cast<float>(color.g),
+            static_cast<float>(color.b), static_cast<float>(color.a)};
+}
+
+}
 
 PluginConfig::PluginConfig(HANDLE handle) {
     using namespace Config::Values;
@@ -40,6 +49,22 @@ PluginConfig::PluginConfig(HANDLE handle) {
         SFloatValueOptions{.min = LensLimits::MOTION_STRENGTH_MIN, .max = LensLimits::MOTION_STRENGTH_MAX});
     m_nearest = makeShared<CBoolValue>("plugin:glasscope:nearest",
                                        "Use nearest-neighbor sampling for pixel inspection", defaults.style.nearest);
+    m_colorStrength = makeShared<CFloatValue>(
+        "plugin:glasscope:color_strength", "Custom colour strength; zero restores the original lens",
+        defaults.style.colorStrength,
+        SFloatValueOptions{.min = LensLimits::COLOR_STRENGTH_MIN, .max = LensLimits::COLOR_STRENGTH_MAX});
+    m_colorWidth = makeShared<CFloatValue>(
+        "plugin:glasscope:color_width", "Custom colour band width in logical pixels; independent of optical edges",
+        defaults.style.colorWidth,
+        SFloatValueOptions{.min = LensLimits::COLOR_WIDTH_MIN, .max = LensLimits::COLOR_WIDTH_MAX});
+    m_transmissionColor = makeShared<CColorValue>("plugin:glasscope:colors:transmission",
+        "Transmitted-light color; alpha controls gentle channel absorption", 0x00000000);
+    m_refractionColor = makeShared<CColorValue>("plugin:glasscope:colors:refraction",
+        "Inner refractive rim color; alpha controls its contribution", 0x00000000);
+    m_reflectionColor = makeShared<CColorValue>("plugin:glasscope:colors:reflection",
+        "Grazing-angle rim reflection color; alpha controls its contribution", 0x00000000);
+    m_highlightColor = makeShared<CColorValue>("plugin:glasscope:colors:highlight",
+        "Specular highlight tint; alpha blends its colour without changing the original lighting", 0x00000000);
 
     if (!HyprlandAPI::addConfigValueV2(handle, m_enabled) || !HyprlandAPI::addConfigValueV2(handle, m_radius) ||
         !HyprlandAPI::addConfigValueV2(handle, m_zoom) || !HyprlandAPI::addConfigValueV2(handle, m_refraction) ||
@@ -47,6 +72,12 @@ PluginConfig::PluginConfig(HANDLE handle) {
         !HyprlandAPI::addConfigValueV2(handle, m_edgeWidth) ||
         !HyprlandAPI::addConfigValueV2(handle, m_edgeStrength) ||
         !HyprlandAPI::addConfigValueV2(handle, m_motionStrength) ||
+        !HyprlandAPI::addConfigValueV2(handle, m_colorStrength) ||
+        !HyprlandAPI::addConfigValueV2(handle, m_colorWidth) ||
+        !HyprlandAPI::addConfigValueV2(handle, m_transmissionColor) ||
+        !HyprlandAPI::addConfigValueV2(handle, m_refractionColor) ||
+        !HyprlandAPI::addConfigValueV2(handle, m_reflectionColor) ||
+        !HyprlandAPI::addConfigValueV2(handle, m_highlightColor) ||
         !HyprlandAPI::addConfigValueV2(handle, m_nearest))
         throw std::runtime_error("glasscope: failed to register config values");
 
@@ -69,6 +100,14 @@ GlasscopeConfig PluginConfig::snapshot() const {
             .edgeWidth = m_edgeWidthOverride.value_or(m_edgeWidth->value()),
             .edgeStrength = m_edgeStrength->value(),
             .motionStrength = m_motionStrength->value(),
+            .colorStrength = m_colorStrength->value(),
+            .colorWidth = m_colorWidth->value(),
+            .colors = {
+                .transmission = colorChannels(m_transmissionColor->value()),
+                .refraction = colorChannels(m_refractionColor->value()),
+                .reflection = colorChannels(m_reflectionColor->value()),
+                .highlight = colorChannels(m_highlightColor->value()),
+            },
             .nearest = m_nearest->value(),
         },
     };
@@ -96,4 +135,4 @@ void PluginConfig::clearOverrides() {
     m_edgeWidthOverride.reset();
 }
 
-} // namespace Glasscope
+}

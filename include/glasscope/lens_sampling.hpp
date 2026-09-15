@@ -8,4 +8,4 @@ inline constexpr float REDUCED_SAMPLE_MAX_RADIUS_PX = 224.0F;
     return physicalRadiusPx <= REDUCED_SAMPLE_MAX_RADIUS_PX ? 10 : 12;
 }
 
-} // namespace Glasscope
+}

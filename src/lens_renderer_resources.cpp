@@ -51,7 +51,7 @@ int bucketedTextureExtent(int required) {
     return ((required + COPY_TEXTURE_BUCKET - 1) / COPY_TEXTURE_BUCKET) * COPY_TEXTURE_BUCKET;
 }
 
-} // namespace
+}
 
 void LensRenderer::releaseCopyTexture() {
     if (m_copyTexture != 0)
@@ -176,11 +176,27 @@ bool LensRenderer::initializeProgram(ShaderProgram& shader, GLuint vertexShader,
     shader.bulge = glGetUniformLocation(shader.program, "uBulge");
     shader.edgeWidth = glGetUniformLocation(shader.program, "uEdgeWidthPx");
     shader.edgeStrength = glGetUniformLocation(shader.program, "uEdgeStrength");
+    shader.colorStrength = glGetUniformLocation(shader.program, "uColorStrength");
+    shader.colorWidth = glGetUniformLocation(shader.program, "uColorWidthPx");
+    shader.transmissionColor = glGetUniformLocation(shader.program, "uTransmissionColor");
+    shader.refractionColor = glGetUniformLocation(shader.program, "uRefractionColor");
+    shader.reflectionColor = glGetUniformLocation(shader.program, "uReflectionColor");
+    shader.highlightColor = glGetUniformLocation(shader.program, "uHighlightColor");
+    shader.scale = glGetUniformLocation(shader.program, "uScale");
+    shader.colorProbeAmount = glGetUniformLocation(shader.program, "uColorProbeAmount");
+    shader.colorProbeCaptured = glGetUniformLocation(shader.program, "uColorProbeCaptured");
+    shader.colorProbeColor = glGetUniformLocation(shader.program, "uColorProbeColor");
 
     if (shader.texture < 0 || shader.resolution < 0 || shader.textureMax < 0 || shader.center < 0 ||
         shader.velocity < 0 || shader.trail < 0 || shader.radius < 0 || shader.zoom < 0 || shader.time < 0 ||
         shader.strength < 0 || shader.dispersion < 0 || shader.reveal < 0 || shader.wobble < 0 ||
         shader.motionStrength < 0 || shader.bulge < 0 || shader.edgeWidth < 0 || shader.edgeStrength < 0) {
+        fail("shader is missing one or more required uniforms");
+        return false;
+    }
+    if (shader.colorStrength < 0 || shader.colorWidth < 0 || shader.transmissionColor < 0 || shader.refractionColor < 0 || shader.reflectionColor < 0 ||
+        shader.highlightColor < 0 || shader.scale < 0 || shader.colorProbeAmount < 0 || shader.colorProbeCaptured < 0 ||
+        shader.colorProbeColor < 0) {
         fail("shader is missing one or more required uniforms");
         return false;
     }
@@ -268,4 +284,4 @@ void LensRenderer::fail(std::string message) {
         m_error = std::move(message);
 }
 
-} // namespace Glasscope
+}

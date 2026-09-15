@@ -6,6 +6,8 @@
 #include <hyprland/src/output/Monitor.hpp>
 #include <hyprland/src/render/pass/PassElement.hpp>
 
+#include <functional>
+
 namespace Glasscope {
 
 struct LensPassData {
@@ -17,6 +19,11 @@ struct LensPassData {
     float reveal = 1.0F;
     float wobble = 0.0F;
     float timeSeconds = 0.0F;
+    float colorProbeAmount = 0.0F;
+    float colorProbeCaptured = 0.0F;
+    std::array<float, 3> colorProbeColor = {};
+    bool captureColor = false;
+    std::function<void(ColorSample)> onColorCaptured;
 };
 
 class LensPassElement final : public IPassElement {
@@ -36,4 +43,4 @@ class LensPassElement final : public IPassElement {
     LensPassData m_data;
 };
 
-} // namespace Glasscope
+}

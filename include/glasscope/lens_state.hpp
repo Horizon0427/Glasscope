@@ -40,4 +40,4 @@ class LensState {
     bool m_hasClock = false;
 };
 
-} // namespace Glasscope
+}

@@ -35,4 +35,4 @@ class LensMotion {
     bool m_hasPointer = false;
 };
 
-} // namespace Glasscope
+}

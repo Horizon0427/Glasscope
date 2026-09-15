@@ -26,7 +26,7 @@ std::vector<UP<IPassElement>> LensPassElement::draw() {
         static_cast<float>(m_data.trailNodes[2].x) * scale, static_cast<float>(m_data.trailNodes[2].y) * scale,
     };
 
-    m_renderer.draw({
+    const bool drawn = m_renderer.draw({
         .framebufferWidth = snapshotWidth,
         .framebufferHeight = snapshotHeight,
         .centerX = static_cast<float>(m_data.centerLocal.x) * scale,
@@ -39,7 +39,13 @@ std::vector<UP<IPassElement>> LensPassElement::draw() {
         .trailNodes = trailNodes,
         .reveal = m_data.reveal,
         .wobble = m_data.wobble,
+        .colorProbeAmount = m_data.colorProbeAmount,
+        .colorProbeCaptured = m_data.colorProbeCaptured,
+        .colorProbeColor = m_data.colorProbeColor,
+        .captureColor = m_data.captureColor,
     });
+    if (const auto sample = m_renderer.takeColorSample(); drawn && sample && m_data.onColorCaptured)
+        m_data.onColorCaptured(*sample);
     return {};
 }
 
@@ -84,4 +90,4 @@ ePassElementType LensPassElement::type() {
     return EK_CUSTOM;
 }
 
-} // namespace Glasscope
+}

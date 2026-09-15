@@ -107,4 +107,4 @@ LensSnapshot LensState::snapshot() const {
     };
 }
 
-} // namespace Glasscope
+}

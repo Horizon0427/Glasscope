@@ -66,6 +66,18 @@ bool LensRenderer::draw(const LensRenderParams& params) {
     if (!checkGlError("framebuffer copy"))
         return false;
 
+    if (params.captureColor) {
+        const int sampleX = std::clamp(static_cast<int>(std::lround(params.centerX)), 0,
+                                       params.framebufferWidth - 1);
+        const int sampleY = std::clamp(static_cast<int>(std::lround(params.centerY)), 0,
+                                       params.framebufferHeight - 1);
+        std::array<std::uint8_t, 4> pixel = {};
+        glReadPixels(sampleX, sampleY, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel.data());
+        if (!checkGlError("color probe readback"))
+            return false;
+        m_colorSample = ColorSample{.red = pixel[0], .green = pixel[1], .blue = pixel[2]};
+    }
+
     const float textureWidth = static_cast<float>(m_copyWidth);
     const float textureHeight = static_cast<float>(m_copyHeight);
     const float textureMaxU = static_cast<float>(copyWidth) / textureWidth;
@@ -113,6 +125,17 @@ bool LensRenderer::draw(const LensRenderParams& params) {
                 std::clamp(params.style.bulge, LensLimits::BULGE_MIN, LensLimits::BULGE_MAX));
     glUniform1f(shader.edgeWidth, std::max(edgeWidthPx, LensLimits::EDGE_WIDTH_MIN));
     glUniform1f(shader.edgeStrength, std::max(params.style.edgeStrength, LensLimits::EDGE_STRENGTH_MIN));
+    glUniform1f(shader.colorStrength, std::clamp(params.style.colorStrength,
+        LensLimits::COLOR_STRENGTH_MIN, LensLimits::COLOR_STRENGTH_MAX));
+    glUniform1f(shader.colorWidth, params.style.colorWidth * params.scale);
+    glUniform4fv(shader.transmissionColor, 1, params.style.colors.transmission.data());
+    glUniform4fv(shader.refractionColor, 1, params.style.colors.refraction.data());
+    glUniform4fv(shader.reflectionColor, 1, params.style.colors.reflection.data());
+    glUniform4fv(shader.highlightColor, 1, params.style.colors.highlight.data());
+    glUniform1f(shader.scale, std::max(params.scale, 0.25F));
+    glUniform1f(shader.colorProbeAmount, std::clamp(params.colorProbeAmount, 0.0F, 1.0F));
+    glUniform1f(shader.colorProbeCaptured, std::clamp(params.colorProbeCaptured, 0.0F, 1.0F));
+    glUniform3fv(shader.colorProbeColor, 1, params.colorProbeColor.data());
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
@@ -126,4 +149,10 @@ bool LensRenderer::draw(const LensRenderParams& params) {
     return checkGlError("lens draw");
 }
 
-} // namespace Glasscope
+std::optional<ColorSample> LensRenderer::takeColorSample() {
+    auto result = m_colorSample;
+    m_colorSample.reset();
+    return result;
+}
+
+}

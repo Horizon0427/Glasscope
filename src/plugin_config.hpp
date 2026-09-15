@@ -3,6 +3,7 @@
 #include "glasscope/lens_config.hpp"
 
 #include <hyprland/src/config/values/types/BoolValue.hpp>
+#include <hyprland/src/config/values/types/ColorValue.hpp>
 #include <hyprland/src/config/values/types/FloatValue.hpp>
 #include <hyprland/src/config/values/types/IntValue.hpp>
 #include <hyprland/src/plugins/PluginAPI.hpp>
@@ -34,6 +35,12 @@ class PluginConfig {
     SP<Config::Values::CFloatValue> m_edgeWidth;
     SP<Config::Values::CFloatValue> m_edgeStrength;
     SP<Config::Values::CFloatValue> m_motionStrength;
+    SP<Config::Values::CFloatValue> m_colorStrength;
+    SP<Config::Values::CFloatValue> m_colorWidth;
+    SP<Config::Values::CColorValue> m_transmissionColor;
+    SP<Config::Values::CColorValue> m_refractionColor;
+    SP<Config::Values::CColorValue> m_reflectionColor;
+    SP<Config::Values::CColorValue> m_highlightColor;
     SP<Config::Values::CBoolValue> m_nearest;
 
     std::optional<float> m_radiusOverride;
@@ -41,4 +48,4 @@ class PluginConfig {
     std::optional<float> m_edgeWidthOverride;
 };
 
-} // namespace Glasscope
+}

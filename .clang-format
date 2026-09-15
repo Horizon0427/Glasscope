@@ -8,3 +8,4 @@ AllowShortIfStatementsOnASingleLine: Never
 DerivePointerAlignment: false
 PointerAlignment: Left
 SortIncludes: CaseSensitive
+FixNamespaceComments: false

@@ -26,4 +26,4 @@ class LensOscillation {
     bool m_pending = false;
 };
 
-} // namespace Glasscope
+}

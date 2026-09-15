@@ -8,7 +8,7 @@ namespace {
 
 constexpr std::array<double, 3> FOLLOW_RATES = {25.0, 17.0, 11.5};
 
-} // namespace
+}
 
 void LensMotion::reset(Vec2 cursor, double nowSeconds) {
     m_center = cursor;
@@ -94,4 +94,4 @@ std::array<Vec2, 3> LensMotion::trailOffsets() const {
     };
 }
 
-} // namespace Glasscope
+}

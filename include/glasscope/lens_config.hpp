@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 namespace Glasscope {
 
 namespace LensLimits {
@@ -20,8 +22,19 @@ inline constexpr float EDGE_STRENGTH_MIN = 0.0F;
 inline constexpr float EDGE_STRENGTH_MAX = 2.5F;
 inline constexpr float MOTION_STRENGTH_MIN = 0.0F;
 inline constexpr float MOTION_STRENGTH_MAX = 2.5F;
+inline constexpr float COLOR_STRENGTH_MIN = 0.0F;
+inline constexpr float COLOR_STRENGTH_MAX = 1.0F;
+inline constexpr float COLOR_WIDTH_MIN = 4.0F;
+inline constexpr float COLOR_WIDTH_MAX = 48.0F;
 
-} // namespace LensLimits
+}
+
+struct LensColors {
+    std::array<float, 4> transmission = {};
+    std::array<float, 4> refraction = {};
+    std::array<float, 4> reflection = {};
+    std::array<float, 4> highlight = {};
+};
 
 struct LensStyle {
     float radius = 190.0F;
@@ -32,6 +45,9 @@ struct LensStyle {
     float edgeWidth = 22.0F;
     float edgeStrength = 1.25F;
     float motionStrength = 1.5F;
+    float colorStrength = 0.0F;
+    float colorWidth = 18.0F;
+    LensColors colors;
     bool nearest = false;
 };
 
@@ -40,4 +56,4 @@ struct GlasscopeConfig {
     LensStyle style;
 };
 
-} // namespace Glasscope
+}
