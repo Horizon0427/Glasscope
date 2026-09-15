@@ -85,8 +85,7 @@ end)
 
 Add this block after the plugin loader. It enables a compact `130` px lens with
 subtle lime and rose accents, and adds the example shortcuts listed below.
-All colour values are written explicitly; no external palette generator is
-required.
+
 
 ```lua
 if os.getenv("HYPR_NO_PLUGINS") ~= "1" and hl.plugin.glasscope ~= nil then
@@ -139,21 +138,9 @@ hyprctl plugin list
 hyprctl configerrors
 ```
 
-| Example shortcut | Action |
-| --- | --- |
-| `Super+Shift+A` | Show or hide the magnifying lens. |
-| `Super+Alt+C` | Start colour picking. |
-| Left click while picking | Sample the pixel and copy its RGB value. |
-| `Super+Alt+Escape` | Cancel picking without copying. |
-
-These shortcuts come from the example configuration; Glasscope does not
-install key bindings automatically. Loading the plugin and displaying the lens
-are separate actions: use the toggle shortcut after loading it.
-
 ## Picking a colour
 
-1. Press `Super+Alt+C` once, then release the keys. You do not need to hold the
-   shortcut while picking.
+1. Press your keybinds once.
 2. Move the crosshair to the pixel you want. The swatch inside the lens follows
    the centre pixel's colour.
 3. Left-click to confirm. Glasscope consumes that press and its matching release,
@@ -162,16 +149,6 @@ are separate actions: use the toggle shortcut after loading it.
    swatch provide feedback. If the lens was hidden before picking, it hides
    again after that feedback fades.
 
-Use `Super+Alt+Escape` to cancel without replacing the clipboard. With your own
-bindings, call `begin_color_probe()` to start and `cancel_color_probe()` to
-cancel. `pick_color()` also supports a one-shot pick at the lens centre without
-first entering interactive probe mode.
-
-Sampling happens **before Glasscope draws its magnification, refraction,
-dispersion and custom colours**. Changing the lens colours therefore does not
-change the sampled RGB value. The sample describes the composited desktop
-pixel, which may differ from an asset's original colour because of application
-or compositor colour processing.
 
 The result currently uses `rgb(R, G, B)` text. `wl-clipboard` must be installed
 for clipboard output.
@@ -186,8 +163,7 @@ The two main controls are independent of the optical geometry:
   its built-in mint/lilac rim and specular highlight. Increase it toward `1.0`
   to add more of the configured colours. The example uses `0.3`.
 - `color_width`: width of the custom colour band in logical pixels. Start with
-  `18.0`; use `12.0` for a thinner band or `22.0` for a wider one. This does not
-  change `edge_width`, which controls the refractive optical rim.
+  `18.0`; use `12.0` for a thinner band or `22.0` for a wider one.
 
 The built-in default for `color_strength` is `0.0`, so setting colour values
 alone does not enable custom colouring. Set it above zero to see your palette.
@@ -200,27 +176,6 @@ alone does not enable custom colouring. Set it above zero to see your palette.
 | `colors.refraction` | Colour on the inner part of the custom band. | `rgba(afd428a6)` — lime, about 65% alpha. |
 | `colors.reflection` | Colour near its outer edge, weighted toward the light-facing side. | `rgba(f77a9599)` — rose, 60% alpha. |
 | `colors.highlight` | Tint blended into the original specular highlight, retaining its shape and intensity coefficient. | `rgba(efe0d580)` — warm off-white, about 50% alpha. |
-
-Use Hyprland's `rgba(RRGGBBAA)` format. The first six hex digits specify the
-colour; the final two specify its individual contribution:
-
-| Alpha suffix | Amount |
-| --- | --- |
-| `00` | Off |
-| `40` | About 25% |
-| `80` | About 50% |
-| `ff` | Full |
-
-For example, changing `rgba(afd428a6)` to `rgba(afd42880)` keeps the same lime
-colour and reduces that layer's contribution. Alpha combines with
-`color_strength` and the layer's spatial mask; it is not the opacity of the
-whole lens.
-
-For vivid colours, try saturated RGB values while keeping `color_strength`
-moderate. Keep transmission subtle if you want the magnified content to stay
-close to its original appearance. Reload with `hyprctl reload config-only`
-after editing; colour changes do not require a rebuild and update even when
-the lens is stationary.
 
 ### All options
 
