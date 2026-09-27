@@ -27,9 +27,13 @@ struct LensRenderParams {
     float timeSeconds = 0.0F;
     float velocityX = 0.0F;
     float velocityY = 0.0F;
+    std::array<float, 2> pullAxis = {1.0F, 0.0F};
     std::array<float, 6> trailNodes = {};
     float reveal = 1.0F;
     float wobble = 0.0F;
+    float interactionWobble = 0.0F;
+    bool pinned = false;
+    float pullShare = 0.28F;
     float colorProbeAmount = 0.0F;
     float colorProbeCaptured = 0.0F;
     std::array<float, 3> colorProbeColor = {};
@@ -60,6 +64,8 @@ class LensRenderer {
         GLint textureMax = -1;
         GLint center = -1;
         GLint velocity = -1;
+        GLint pullAxis = -1;
+        GLint pullShape = -1;
         GLint trail = -1;
         GLint radius = -1;
         GLint zoom = -1;
@@ -68,6 +74,8 @@ class LensRenderer {
         GLint dispersion = -1;
         GLint reveal = -1;
         GLint wobble = -1;
+        GLint interactionStretch = -1;
+        GLint pinned = -1;
         GLint motionStrength = -1;
         GLint bulge = -1;
         GLint edgeWidth = -1;

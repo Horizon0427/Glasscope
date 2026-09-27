@@ -96,6 +96,7 @@ struct PluginRuntime::Impl {
     ~Impl() = default;
 
     void toggle() {
+        syncEnabled();
         if (!configuredEnabled())
             return;
         const Vector2D cursor = g_pInputManager->getMouseCoordsInternal();
@@ -107,6 +108,7 @@ struct PluginRuntime::Impl {
     }
 
     void show() {
+        syncEnabled();
         if (!configuredEnabled())
             return;
         const Vector2D cursor = g_pInputManager->getMouseCoordsInternal();
@@ -124,12 +126,18 @@ struct PluginRuntime::Impl {
     }
 
     void beginColorProbe() {
-        if (!configuredEnabled())
+        syncEnabled();
+        if (!configuredEnabled() || sessionLocked() || m_state.pressed() || m_consumeLeftRelease)
             return;
 
         const double now = nowSeconds();
         const LensSnapshot before = m_state.snapshot();
         m_probeMadeVisible = m_probeMadeVisible || !before.requestedVisible;
+        if (before.pinned) {
+            m_probePinnedCenter = before.center;
+            m_probeWasPinned = true;
+            m_state.setPinned(false, fromHypr(g_pInputManager->getMouseCoordsInternal()), now);
+        }
         m_colorProbeActive = true;
         m_colorCaptureRequested = false;
         m_probeFeedbackUntil = 0.0;
@@ -143,6 +151,7 @@ struct PluginRuntime::Impl {
     }
 
     void pickColor() {
+        syncEnabled();
         if (!configuredEnabled())
             return;
 
@@ -164,6 +173,24 @@ struct PluginRuntime::Impl {
 
     void cancelColorProbe() {
         clearColorProbe(true);
+    }
+
+    void togglePin() {
+        syncEnabled();
+        if (!configuredEnabled() || sessionLocked())
+            return;
+        clearColorProbe(true);
+        const double now = nowSeconds();
+        const LensSnapshot before = m_state.snapshot();
+        const Vec2 cursor = fromHypr(g_pInputManager->getMouseCoordsInternal());
+        const bool pin = !before.pinned;
+        m_state.setPinned(pin, pin && before.requestedVisible ? before.center : cursor, now);
+        m_state.setVisible(true, cursor, now);
+        damageTransition(before, m_state.snapshot());
+    }
+
+    bool isPinned() const {
+        return m_state.snapshot().pinned;
     }
 
     float adjustZoom(float delta) {
@@ -194,6 +221,7 @@ struct PluginRuntime::Impl {
     }
 
     void shutdown() {
+        m_state.cancelPress();
         clearColorProbe(false);
         m_pendingClipboardAction.reset();
         m_pointerListener.reset();
@@ -212,36 +240,89 @@ struct PluginRuntime::Impl {
     }
 
   private:
+    void syncEnabled() {
+        const bool enabled = m_config.enabled();
+        if (m_configEnabled && !enabled)
+            disableRuntime();
+        m_configEnabled = enabled;
+    }
+
+    bool sessionLocked() const {
+        return g_pSessionLockManager && g_pSessionLockManager->isSessionLocked();
+    }
+
+    bool acceptsPress(Vec2 cursor) const {
+        const LensSnapshot snapshot = m_state.snapshot();
+        if (!snapshot.pinned || !snapshot.requestedVisible || m_colorCaptureRequested || m_probeFeedbackUntil > 0.0)
+            return false;
+        const auto monitor = State::monitorState()->query().vec(toHypr(snapshot.center)).run();
+        if (!monitor || monitor->m_transform != WL_OUTPUT_TRANSFORM_NORMAL)
+            return false;
+        const auto pointerMonitor = State::monitorState()->query().vec(toHypr(cursor)).run();
+        return pointerMonitor == monitor && lensContains(cursor, snapshot, currentConfig().style, monitor->m_scale);
+    }
+
     void registerListeners() {
         m_pointerListener =
-            Event::bus()->m_events.input.mouse.move.listen([this](Vector2D position, Event::SCallbackInfo&) {
-                if (!configuredEnabled())
+            Event::bus()->m_events.input.mouse.move.listen([this](Vector2D position, Event::SCallbackInfo& info) {
+                syncEnabled();
+                if (sessionLocked()) {
+                    m_state.cancelPress();
+                    m_consumeLeftRelease = false;
+                    return;
+                }
+                if (!configuredEnabled() || info.cancelled)
                     return;
                 const double now = nowSeconds();
                 const LensSnapshot before = m_state.snapshot();
-                if (before.requestedVisible || m_state.rendering()) {
+                if ((before.requestedVisible || m_state.rendering()) && (!before.pinned || m_state.pressed())) {
                     m_state.move(fromHypr(position), now);
                     damageTransition(before, m_state.snapshot());
                 }
+                if (m_state.pressed())
+                    info.cancelled = true;
                 if (m_colorProbeActive)
                     hideCursorForProbe();
             });
 
         m_mouseButtonListener = Event::bus()->m_events.input.mouse.button.listen(
             [this](IPointer::SButtonEvent event, Event::SCallbackInfo& info) {
+                syncEnabled();
                 if (event.button != BTN_LEFT)
+                    return;
+
+                if (sessionLocked()) {
+                    m_state.cancelPress();
+                    m_consumeLeftRelease = false;
+                    return;
+                }
+
+                if (m_consumeLeftRelease && event.state == WL_POINTER_BUTTON_STATE_RELEASED) {
+                    info.cancelled = true;
+                    m_consumeLeftRelease = false;
+                    const LensSnapshot before = m_state.snapshot();
+                    m_state.endPress(nowSeconds());
+                    damageTransition(before, m_state.snapshot());
+                    return;
+                }
+
+                if (!configuredEnabled() || info.cancelled)
                     return;
 
                 if (m_colorProbeActive && event.state == WL_POINTER_BUTTON_STATE_PRESSED) {
                     info.cancelled = true;
-                    m_consumeProbeLeftRelease = true;
+                    m_consumeLeftRelease = true;
                     pickColor();
                     return;
                 }
 
-                if (m_consumeProbeLeftRelease && event.state == WL_POINTER_BUTTON_STATE_RELEASED) {
+                const Vec2 cursor = fromHypr(g_pInputManager->getMouseCoordsInternal());
+                const LensSnapshot before = m_state.snapshot();
+                if (event.state == WL_POINTER_BUTTON_STATE_PRESSED && acceptsPress(cursor) &&
+                    m_state.beginPress(cursor, nowSeconds(), currentConfig().style.radius)) {
                     info.cancelled = true;
-                    m_consumeProbeLeftRelease = false;
+                    m_consumeLeftRelease = true;
+                    damageTransition(before, m_state.snapshot());
                 }
             });
 
@@ -270,6 +351,7 @@ struct PluginRuntime::Impl {
     }
 
     void onLastRenderMoment() {
+        syncEnabled();
         const auto monitor = g_pHyprRenderer->m_renderData.pMonitor.lock();
         if (!monitor)
             return;
@@ -280,6 +362,13 @@ struct PluginRuntime::Impl {
         }
 
         const double now = nowSeconds();
+        if (sessionLocked()) {
+            m_state.cancelPress();
+            m_consumeLeftRelease = false;
+            if (m_colorProbeActive || m_colorCaptureRequested)
+                clearColorProbe(true);
+            return;
+        }
         expireColorProbeFeedback(now);
 
         if (!configuredEnabled() || (!m_state.snapshot().requestedVisible && !m_state.rendering()))
@@ -293,12 +382,6 @@ struct PluginRuntime::Impl {
         const auto cursorMonitor = State::monitorState()->query().vec(toHypr(snapshot.center)).run();
         if (!cursorMonitor || cursorMonitor != monitor)
             return;
-
-        if (g_pSessionLockManager && g_pSessionLockManager->isSessionLocked()) {
-            if (m_colorProbeActive || m_colorCaptureRequested)
-                clearColorProbe(true);
-            return;
-        }
 
         if (monitor->m_transform != WL_OUTPUT_TRANSFORM_NORMAL) {
             if (!m_transformWarningShown) {
@@ -342,27 +425,31 @@ struct PluginRuntime::Impl {
         if (m_colorCaptureRequested)
             captureCallback = [this](ColorSample sample) { completeColorCapture(sample); };
 
-        g_pHyprRenderer->addPassElement(
-            makeUnique<LensPassElement>(m_renderer, LensPassData{
-                                                        .monitor = monitor,
-                                                        .centerLocal = centerLocal,
-                                                        .velocity = toHypr(snapshot.velocity),
-                                                        .trailNodes =
-                                                            {
-                                                                toHypr(snapshot.trailNodes[0]),
-                                                                toHypr(snapshot.trailNodes[1]),
-                                                                toHypr(snapshot.trailNodes[2]),
-                                                            },
-                                                        .style = config.style,
-                                                        .reveal = static_cast<float>(snapshot.reveal),
-                                                        .wobble = static_cast<float>(snapshot.wobble),
-                                                        .timeSeconds = static_cast<float>(snapshot.phase),
-                                                        .colorProbeAmount = probeAmount,
-                                                        .colorProbeCaptured = capturedFeedback ? 1.0F : 0.0F,
-                                                        .colorProbeColor = m_probeColor,
-                                                        .captureColor = m_colorCaptureRequested,
-                                                        .onColorCaptured = std::move(captureCallback),
-                                                    }));
+        g_pHyprRenderer->addPassElement(makeUnique<LensPassElement>(
+            m_renderer, LensPassData{
+                            .monitor = monitor,
+                            .centerLocal = centerLocal,
+                            .velocity = toHypr(snapshot.velocity),
+                            .pullAxis = toHypr(snapshot.pullAxis),
+                            .trailNodes =
+                                {
+                                    toHypr(snapshot.trailNodes[0]),
+                                    toHypr(snapshot.trailNodes[1]),
+                                    toHypr(snapshot.trailNodes[2]),
+                                },
+                            .style = config.style,
+                            .reveal = static_cast<float>(snapshot.reveal),
+                            .wobble = static_cast<float>(snapshot.wobble),
+                            .interactionWobble = static_cast<float>(snapshot.interactionWobble),
+                            .pinned = snapshot.pinned,
+                            .pullShare = static_cast<float>(snapshot.pullShare),
+                            .timeSeconds = static_cast<float>(snapshot.phase),
+                            .colorProbeAmount = probeAmount,
+                            .colorProbeCaptured = capturedFeedback ? 1.0F : 0.0F,
+                            .colorProbeColor = m_probeColor,
+                            .captureColor = m_colorCaptureRequested,
+                            .onColorCaptured = std::move(captureCallback),
+                        }));
     }
 
     GlasscopeConfig currentConfig() const {
@@ -413,6 +500,7 @@ struct PluginRuntime::Impl {
     }
 
     void handleRendererFailure() {
+        m_state.cancelPress();
         const auto error = m_renderer.takeError();
         clearColorProbe(false);
         m_rendererDisabled = true;
@@ -470,6 +558,7 @@ struct PluginRuntime::Impl {
 
         const LensSnapshot before = m_state.snapshot();
         m_probeFeedbackUntil = 0.0;
+        restorePinnedAfterProbe();
         if (m_probeMadeVisible) {
             m_probeMadeVisible = false;
             m_state.setVisible(false, before.center, now);
@@ -484,11 +573,19 @@ struct PluginRuntime::Impl {
         restoreCursorAfterProbe();
         m_colorCaptureRequested = false;
         m_probeFeedbackUntil = 0.0;
+        restorePinnedAfterProbe();
         if (restoreVisibility && m_probeMadeVisible)
             m_state.setVisible(false, before.center, nowSeconds());
         m_probeMadeVisible = false;
         if (hadProbe)
             damageTransition(before, m_state.snapshot());
+    }
+
+    void restorePinnedAfterProbe() {
+        if (!m_probeWasPinned)
+            return;
+        m_probeWasPinned = false;
+        m_state.setPinned(true, m_probePinnedCenter, nowSeconds());
     }
 
     void hideCursorForProbe() {
@@ -533,7 +630,9 @@ struct PluginRuntime::Impl {
     bool m_releaseRendererRequested = false;
     bool m_colorProbeActive = false;
     bool m_colorCaptureRequested = false;
-    bool m_consumeProbeLeftRelease = false;
+    bool m_consumeLeftRelease = false;
+    bool m_probeWasPinned = false;
+    Vec2 m_probePinnedCenter;
     bool m_probeMadeVisible = false;
     bool m_cursorHiddenForProbe = false;
     double m_probeFeedbackUntil = 0.0;
@@ -556,6 +655,14 @@ void PluginRuntime::show() {
 
 void PluginRuntime::hide() {
     m_impl->hide();
+}
+
+void PluginRuntime::togglePin() {
+    m_impl->togglePin();
+}
+
+bool PluginRuntime::isPinned() const {
+    return m_impl->isPinned();
 }
 
 void PluginRuntime::beginColorProbe() {

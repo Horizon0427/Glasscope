@@ -17,6 +17,8 @@ class PluginRuntime {
     void toggle();
     void show();
     void hide();
+    void togglePin();
+    [[nodiscard]] bool isPinned() const;
     void beginColorProbe();
     void pickColor();
     void cancelColorProbe();

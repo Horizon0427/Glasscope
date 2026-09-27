@@ -73,3 +73,17 @@ endif()
 target_link_options(glasscope PRIVATE
   -Wl,-z,relro,-z,now
 )
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(glasscope-interaction-test tests/interaction_test.cpp)
+  target_link_libraries(glasscope-interaction-test PRIVATE glasscope-core)
+  glasscope_enable_warnings(glasscope-interaction-test)
+  add_test(NAME glasscope-interaction COMMAND glasscope-interaction-test)
+  foreach(test IN ITEMS visibility config)
+    add_executable(glasscope-${test}-test tests/${test}_test.cpp)
+    target_link_libraries(glasscope-${test}-test PRIVATE glasscope-core)
+    glasscope_enable_warnings(glasscope-${test}-test)
+    add_test(NAME glasscope-${test} COMMAND glasscope-${test}-test)
+  endforeach()
+endif()

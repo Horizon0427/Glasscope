@@ -38,6 +38,17 @@ int luaHide(lua_State*) {
     return 0;
 }
 
+int luaTogglePin(lua_State*) {
+    if (g_plugin)
+        g_plugin->togglePin();
+    return 0;
+}
+
+int luaIsPinned(lua_State* state) {
+    lua_pushboolean(state, g_plugin && g_plugin->isPinned());
+    return 1;
+}
+
 int luaBeginColorProbe(lua_State*) {
     if (g_plugin)
         g_plugin->beginColorProbe();
@@ -106,12 +117,15 @@ void unregisterBindings(HANDLE handle) {
     HyprlandAPI::removeDispatcher(handle, "glasscope:toggle");
     HyprlandAPI::removeDispatcher(handle, "glasscope:show");
     HyprlandAPI::removeDispatcher(handle, "glasscope:hide");
+    HyprlandAPI::removeDispatcher(handle, "glasscope:toggle-pin");
     HyprlandAPI::removeDispatcher(handle, "glasscope:begin-color-probe");
     HyprlandAPI::removeDispatcher(handle, "glasscope:pick-color");
     HyprlandAPI::removeDispatcher(handle, "glasscope:cancel-color-probe");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "toggle");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "show");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "hide");
+    HyprlandAPI::removeLuaFunction(handle, "glasscope", "toggle_pin");
+    HyprlandAPI::removeLuaFunction(handle, "glasscope", "is_pinned");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "begin_color_probe");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "pick_color");
     HyprlandAPI::removeLuaFunction(handle, "glasscope", "cancel_color_probe");
@@ -146,6 +160,12 @@ void registerBindings(HANDLE handle) {
             g_plugin->beginColorProbe();
         return SDispatchResult{};
     });
+
+    addDispatcher("glasscope:toggle-pin", [](const std::string&) {
+        if (g_plugin)
+            g_plugin->togglePin();
+        return SDispatchResult{};
+    });
     addDispatcher("glasscope:pick-color", [](const std::string&) {
         if (g_plugin)
             g_plugin->pickColor();
@@ -160,6 +180,8 @@ void registerBindings(HANDLE handle) {
     if (!HyprlandAPI::addLuaFunction(handle, "glasscope", "toggle", luaToggle) ||
         !HyprlandAPI::addLuaFunction(handle, "glasscope", "show", luaShow) ||
         !HyprlandAPI::addLuaFunction(handle, "glasscope", "hide", luaHide) ||
+        !HyprlandAPI::addLuaFunction(handle, "glasscope", "toggle_pin", luaTogglePin) ||
+        !HyprlandAPI::addLuaFunction(handle, "glasscope", "is_pinned", luaIsPinned) ||
         !HyprlandAPI::addLuaFunction(handle, "glasscope", "begin_color_probe", luaBeginColorProbe) ||
         !HyprlandAPI::addLuaFunction(handle, "glasscope", "pick_color", luaPickColor) ||
         !HyprlandAPI::addLuaFunction(handle, "glasscope", "cancel_color_probe", luaCancelColorProbe) ||

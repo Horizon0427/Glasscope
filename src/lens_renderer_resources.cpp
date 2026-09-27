@@ -34,12 +34,18 @@ std::string programLog(GLuint program) {
 
 const char* glErrorName(GLenum error) {
     switch (error) {
-        case GL_INVALID_ENUM: return "GL_INVALID_ENUM";
-        case GL_INVALID_VALUE: return "GL_INVALID_VALUE";
-        case GL_INVALID_OPERATION: return "GL_INVALID_OPERATION";
-        case GL_OUT_OF_MEMORY: return "GL_OUT_OF_MEMORY";
-        case GL_INVALID_FRAMEBUFFER_OPERATION: return "GL_INVALID_FRAMEBUFFER_OPERATION";
-        default: return "unknown OpenGL error";
+    case GL_INVALID_ENUM:
+        return "GL_INVALID_ENUM";
+    case GL_INVALID_VALUE:
+        return "GL_INVALID_VALUE";
+    case GL_INVALID_OPERATION:
+        return "GL_INVALID_OPERATION";
+    case GL_OUT_OF_MEMORY:
+        return "GL_OUT_OF_MEMORY";
+    case GL_INVALID_FRAMEBUFFER_OPERATION:
+        return "GL_INVALID_FRAMEBUFFER_OPERATION";
+    default:
+        return "unknown OpenGL error";
     }
 }
 
@@ -98,8 +104,8 @@ bool LensRenderer::initialize() {
     const GLuint vertex = compile(GL_VERTEX_SHADER, vertexSource);
     if (vertex == 0)
         return false;
-    const bool programsReady = initializeProgram(m_shaders[0], vertex, 10) &&
-                               initializeProgram(m_shaders[1], vertex, 12);
+    const bool programsReady =
+        initializeProgram(m_shaders[0], vertex, 10) && initializeProgram(m_shaders[1], vertex, 12);
     glDeleteShader(vertex);
     if (!programsReady) {
         destroy();
@@ -164,6 +170,8 @@ bool LensRenderer::initializeProgram(ShaderProgram& shader, GLuint vertexShader,
     shader.textureMax = glGetUniformLocation(shader.program, "uTextureMax");
     shader.center = glGetUniformLocation(shader.program, "uCenter");
     shader.velocity = glGetUniformLocation(shader.program, "uVelocity");
+    shader.pullAxis = glGetUniformLocation(shader.program, "uPullAxis");
+    shader.pullShape = glGetUniformLocation(shader.program, "uPullShape");
     shader.trail = glGetUniformLocation(shader.program, "uTrailNodes[0]");
     shader.radius = glGetUniformLocation(shader.program, "uRadiusPx");
     shader.zoom = glGetUniformLocation(shader.program, "uZoom");
@@ -171,7 +179,9 @@ bool LensRenderer::initializeProgram(ShaderProgram& shader, GLuint vertexShader,
     shader.strength = glGetUniformLocation(shader.program, "uStrength");
     shader.dispersion = glGetUniformLocation(shader.program, "uDispersion");
     shader.reveal = glGetUniformLocation(shader.program, "uReveal");
+    shader.interactionStretch = glGetUniformLocation(shader.program, "uInteractionStretch");
     shader.wobble = glGetUniformLocation(shader.program, "uWobble");
+    shader.pinned = glGetUniformLocation(shader.program, "uPinned");
     shader.motionStrength = glGetUniformLocation(shader.program, "uMotionStrength");
     shader.bulge = glGetUniformLocation(shader.program, "uBulge");
     shader.edgeWidth = glGetUniformLocation(shader.program, "uEdgeWidthPx");
@@ -188,15 +198,16 @@ bool LensRenderer::initializeProgram(ShaderProgram& shader, GLuint vertexShader,
     shader.colorProbeColor = glGetUniformLocation(shader.program, "uColorProbeColor");
 
     if (shader.texture < 0 || shader.resolution < 0 || shader.textureMax < 0 || shader.center < 0 ||
-        shader.velocity < 0 || shader.trail < 0 || shader.radius < 0 || shader.zoom < 0 || shader.time < 0 ||
-        shader.strength < 0 || shader.dispersion < 0 || shader.reveal < 0 || shader.wobble < 0 ||
-        shader.motionStrength < 0 || shader.bulge < 0 || shader.edgeWidth < 0 || shader.edgeStrength < 0) {
+        shader.velocity < 0 || shader.pullAxis < 0 || shader.pullShape < 0 || shader.trail < 0 || shader.radius < 0 ||
+        shader.zoom < 0 || shader.time < 0 || shader.strength < 0 || shader.dispersion < 0 || shader.reveal < 0 ||
+        shader.wobble < 0 || shader.interactionStretch < 0 || shader.pinned < 0 || shader.motionStrength < 0 ||
+        shader.bulge < 0 || shader.edgeWidth < 0 || shader.edgeStrength < 0) {
         fail("shader is missing one or more required uniforms");
         return false;
     }
-    if (shader.colorStrength < 0 || shader.colorWidth < 0 || shader.transmissionColor < 0 || shader.refractionColor < 0 || shader.reflectionColor < 0 ||
-        shader.highlightColor < 0 || shader.scale < 0 || shader.colorProbeAmount < 0 || shader.colorProbeCaptured < 0 ||
-        shader.colorProbeColor < 0) {
+    if (shader.colorStrength < 0 || shader.colorWidth < 0 || shader.transmissionColor < 0 ||
+        shader.refractionColor < 0 || shader.reflectionColor < 0 || shader.highlightColor < 0 || shader.scale < 0 ||
+        shader.colorProbeAmount < 0 || shader.colorProbeCaptured < 0 || shader.colorProbeColor < 0) {
         fail("shader is missing one or more required uniforms");
         return false;
     }

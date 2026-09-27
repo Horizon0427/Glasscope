@@ -35,6 +35,7 @@ class PluginConfig {
     SP<Config::Values::CFloatValue> m_edgeWidth;
     SP<Config::Values::CFloatValue> m_edgeStrength;
     SP<Config::Values::CFloatValue> m_motionStrength;
+    SP<Config::Values::CFloatValue> m_interactionBounce;
     SP<Config::Values::CFloatValue> m_colorStrength;
     SP<Config::Values::CFloatValue> m_colorWidth;
     SP<Config::Values::CColorValue> m_transmissionColor;

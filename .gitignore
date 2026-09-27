@@ -4,7 +4,6 @@
 /dist/
 /examples/
 /preview/
-/tests/
 /scripts/test-nested-lifecycle.sh
 /compile_commands.json
 /*.so

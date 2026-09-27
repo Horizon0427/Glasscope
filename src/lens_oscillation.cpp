@@ -42,6 +42,13 @@ void LensOscillation::observeMotion(Vec2 cursor, double speed, double nowSeconds
     m_lastMotion = nowSeconds;
 }
 
+void LensOscillation::impulse(Vec2 cursor, double nowSeconds, double strength) {
+    resetDynamics(cursor, nowSeconds);
+    m_strength = std::clamp(strength, 0.0, 0.8);
+    m_age = 0.0;
+    m_value = 0.0;
+}
+
 void LensOscillation::advance(double nowSeconds, double elapsed) {
     const double idleDuration = std::max(nowSeconds - m_lastMotion, 0.0);
     if (m_pending && idleDuration >= STOP_BOUNCE_DELAY) {
@@ -50,8 +57,7 @@ void LensOscillation::advance(double nowSeconds, double elapsed) {
     }
     if (m_age >= 0.0) {
         m_age += elapsed;
-        m_value = -m_strength * std::exp(-STOP_BOUNCE_DAMPING * m_age) *
-                  std::sin(STOP_BOUNCE_FREQUENCY * m_age);
+        m_value = -m_strength * std::exp(-STOP_BOUNCE_DAMPING * m_age) * std::sin(STOP_BOUNCE_FREQUENCY * m_age);
         if (m_age >= STOP_BOUNCE_DURATION) {
             m_value = 0.0;
             m_strength = 0.0;

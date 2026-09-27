@@ -8,6 +8,7 @@ class LensOscillation {
   public:
     void syncPointer(Vec2 cursor, double nowSeconds);
     void open(Vec2 cursor, double nowSeconds);
+    void impulse(Vec2 cursor, double nowSeconds, double strength);
     void observeMotion(Vec2 cursor, double speed, double nowSeconds);
     void advance(double nowSeconds, double elapsed);
     void settle(Vec2 cursor, double nowSeconds);

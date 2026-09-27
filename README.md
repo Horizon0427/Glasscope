@@ -11,14 +11,16 @@ application underneath.
 - A magnifying lens with refraction, colour dispersion and a convex centre.
 - A soft trailing shape while moving, followed by a short liquid bounce when
   the pointer stops.
+- Pin the live lens in place, tap it for a small tremble, or pull its surface
+  with an anchored elastic rebound.
 - Smooth filtering for reading and nearest-neighbour sampling for pixel work.
 - Click-to-pick colour sampling with an adaptive crosshair, live swatch and
   `rgb(R, G, B)` clipboard output.
 - Four configurable colour layers: transmission, inner refraction, outer
   reflection and highlight. Colour strength and band width are independent.
-- Normal pointer input passes through. The left-button press and release used
-  to confirm a colour pick are consumed so they do not click the application
-  underneath.
+- Pointer input passes through in follow mode. A pinned lens consumes left
+  clicks inside its shape and their matching releases, including after a drag
+  leaves the shape. Colour-pick confirmation also consumes its press and release.
 - Lua functions and Hyprland dispatchers for custom bindings.
 
 ## Requirements
@@ -102,6 +104,7 @@ if os.getenv("HYPR_NO_PLUGINS") ~= "1" and hl.plugin.glasscope ~= nil then
                 dispersion = 0.7,
                 edge_strength = 1.25,
                 motion_strength = 1.5,
+                interaction_bounce = 1.0,
                 nearest = false,
 
                 color_strength = 0.3,
@@ -123,6 +126,10 @@ if os.getenv("HYPR_NO_PLUGINS") ~= "1" and hl.plugin.glasscope ~= nil then
     hl.bind("SUPER + ALT + C", function()
         hl.plugin.glasscope.begin_color_probe()
     end, { description = "Start Glasscope colour picker" })
+
+    hl.bind("SUPER + ALT + A", function()
+        hl.plugin.glasscope.toggle_pin()
+    end, { description = "Pin or unpin Glasscope lens" })
 
     hl.bind("SUPER + ALT + Escape", function()
         hl.plugin.glasscope.cancel_color_probe()
@@ -152,6 +159,60 @@ hyprctl configerrors
 
 The result currently uses `rgb(R, G, B)` text. `wl-clipboard` must be installed
 for clipboard output.
+
+## Pinning and dragging
+
+With the example bindings, press `Super+Alt+A` to pin the lens at its current
+position. If it is hidden, this opens a pinned lens at the pointer. The picture
+remains live while the pointer can move independently.
+
+Press inside the pinned shape for a small, steady compression; release a click
+for one liquid bounce. Hold and pull to deform the whole lens: it lengthens
+as two joined drops. The first press chooses the pulled share from its depth
+inside the resting lens: about 6% near the rim, increasing smoothly to 50% at
+the centre. This controls the relative weights of two implicit field sources. Moving
+the pointer during that drag does not change the allocation. Re-grabbing during
+a rebound blends toward the new allocation to avoid an abrupt size change.
+
+The body source remains at the pin. The sources blend through an inverse-square
+metaball field, so the neck curves continuously into both lobes without an
+inserted straight bridge. Separation approaches the field's pinch-off distance
+with a safety margin. The complete silhouette is numerically normalized to the
+resting projected area. This is a visual surface model, not a fluid simulation.
+The field construction follows [Jamie Wong's explanation of metaballs](https://jamie-wong.com/2014/08/19/metaballs-and-marching-squares/);
+the damped return uses the spring-and-damper principle described in
+[Gaffer on Games](https://gafferongames.com/post/spring_physics/).
+The pin and sampling position stay fixed. The pull limit remains 1.8 times the
+radius with increasing resistance; release damping follows the stored pull
+strength, and the returning surface briefly compresses as the drops merge.
+Releasing a pull lets that deformation spring back, without adding a separate
+click bounce. Recent drag velocity carries into release; pausing first lets
+that momentum decay. Near the merge, a smooth transition connects the liquid
+lobes to an area-preserving squash. Clicks release from their existing pressure
+state into a damped spring, including when a rebound is grabbed again.
+Settled clicks choose a new deformation direction and vary the impulse by up to
+8%; re-grabbing an active bounce preserves its direction. At the first merge,
+drag recoil excites a short surface shiver with the following lens's faster
+rhythm. The main squash is slightly gentler, leaving the smaller ripples visible.
+The ordinary following animation itself is unchanged.
+These transitions follow the continuous position-and-velocity approach in
+[The Orange Duck's spring animation guide](https://theorangeduck.com/page/spring-roll-call).
+
+`interaction_bounce` controls the pinned click and recoil squash amplitude:
+`1.0` is the default, `1.5` is stronger, and `0` disables this added surface
+bounce. It does not change held pull reach, the return timing, or the ordinary
+pointer-stop bounce. `motion_strength` remains the master deformation control.
+Small pointer jitter does not stretch the lens. Transparent
+corners pass clicks through.
+
+Press `Super+Alt+A` again to resume following. `Super+Shift+A` still hides or
+shows the lens, preserving its pinned position. Disabling or unloading the
+plugin resets the pin. Starting a colour probe temporarily follows the pointer;
+cancelling or completing it restores the pinned position after the feedback.
+
+Other mouse buttons and scrolling retain their normal behaviour. Only begin a
+pull from inside the pinned lens; a drag started in the application stays with
+that application.
 
 ## Configuring lens colours
 
@@ -192,6 +253,7 @@ Dimensions are logical pixels and follow the monitor scale.
 | `dispersion` | float | `0.7` | `0..2` |
 | `edge_strength` | float | `1.25` | `0..2.5` |
 | `motion_strength` | float | `1.5` | `0..2.5` |
+| `interaction_bounce` | float | `1.0` | `0..2.5` |
 | `nearest` | bool | `false` | `true` / `false` |
 | `color_strength` | float | `0.0` | `0..1` |
 | `color_width` | float | `18.0` | `4..48` |
@@ -199,6 +261,13 @@ Dimensions are logical pixels and follow the monitor scale.
 | `colors.refraction` | colour | `rgba(00000000)` | Hyprland colour |
 | `colors.reflection` | colour | `rgba(00000000)` | Hyprland colour |
 | `colors.highlight` | colour | `rgba(00000000)` | Hyprland colour |
+
+Glasscope clamps finite numeric settings to the ranges above before using them.
+Non-finite settings (NaN or infinity) fall back to that option's built-in default.
+This applies to direct configuration writes as well as temporary adjustment
+overrides. Hyprland's `getoption` can still report the raw configured value;
+Glasscope normalizes its effective snapshot without rewriting the configuration.
+The `adjust_*` Lua functions reject non-finite deltas without changing the value.
 
 `bulge` controls additional convex magnification near the centre. `refraction`
 controls edge displacement and optical tint; `dispersion` controls RGB
@@ -215,6 +284,8 @@ Functions are available under `hl.plugin.glasscope` after the plugin loads.
 | `toggle()` | Show or hide the lens at the pointer. |
 | `show()` | Show the lens. |
 | `hide()` | Hide the lens and cancel an active probe. |
+| `toggle_pin()` | Pin the lens, or resume following the pointer; shows a hidden lens. |
+| `is_pinned()` | Return whether the lens is currently pinned. |
 | `begin_color_probe()` | Enter interactive picking until a left click or cancellation. |
 | `pick_color()` | Request a centre-pixel sample and clipboard copy; also works as a one-shot action. |
 | `cancel_color_probe()` | Leave probe mode without sampling. |
@@ -232,7 +303,7 @@ end)
 ```
 
 The corresponding dispatcher names are `glasscope:toggle`, `glasscope:show`,
-`glasscope:hide`, `glasscope:begin-color-probe`, `glasscope:pick-color` and
+`glasscope:hide`, `glasscope:toggle-pin`, `glasscope:begin-color-probe`, `glasscope:pick-color` and
 `glasscope:cancel-color-probe`. In Lua configuration, use the functions above.
 
 ### Hidden, disabled and unloaded

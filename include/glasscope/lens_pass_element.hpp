@@ -14,10 +14,14 @@ struct LensPassData {
     PHLMONITORREF monitor;
     Vector2D centerLocal;
     Vector2D velocity;
+    Vector2D pullAxis = {1.0, 0.0};
     std::array<Vector2D, 3> trailNodes;
     LensStyle style;
     float reveal = 1.0F;
     float wobble = 0.0F;
+    float interactionWobble = 0.0F;
+    bool pinned = false;
+    float pullShare = 0.28F;
     float timeSeconds = 0.0F;
     float colorProbeAmount = 0.0F;
     float colorProbeCaptured = 0.0F;

@@ -15,8 +15,7 @@ bool LensRenderer::draw(const LensRenderParams& params) {
         return false;
     const float radiusPx = params.style.radius * params.scale;
     const float edgeWidthPx = params.style.edgeWidth * params.scale;
-    if (params.framebufferWidth <= 0 || params.framebufferHeight <= 0 || radiusPx <= 1.0F ||
-        params.reveal <= 0.0F)
+    if (params.framebufferWidth <= 0 || params.framebufferHeight <= 0 || radiusPx <= 1.0F || params.reveal <= 0.0F)
         return true;
 
     GLStateGuard stateGuard;
@@ -67,10 +66,8 @@ bool LensRenderer::draw(const LensRenderParams& params) {
         return false;
 
     if (params.captureColor) {
-        const int sampleX = std::clamp(static_cast<int>(std::lround(params.centerX)), 0,
-                                       params.framebufferWidth - 1);
-        const int sampleY = std::clamp(static_cast<int>(std::lround(params.centerY)), 0,
-                                       params.framebufferHeight - 1);
+        const int sampleX = std::clamp(static_cast<int>(std::lround(params.centerX)), 0, params.framebufferWidth - 1);
+        const int sampleY = std::clamp(static_cast<int>(std::lround(params.centerY)), 0, params.framebufferHeight - 1);
         std::array<std::uint8_t, 4> pixel = {};
         glReadPixels(sampleX, sampleY, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel.data());
         if (!checkGlError("color probe readback"))
@@ -92,10 +89,7 @@ bool LensRenderer::draw(const LensRenderParams& params) {
         static_cast<float>(sourceY + copyHeight) / static_cast<float>(params.framebufferHeight) * 2.0F - 1.0F;
 
     const std::array<float, 16> vertices = {
-        x0, y0, 0.0F, 0.0F,
-        x1, y0, textureMaxU, 0.0F,
-        x0, y1, 0.0F, textureMaxV,
-        x1, y1, textureMaxU, textureMaxV,
+        x0, y0, 0.0F, 0.0F, x1, y0, textureMaxU, 0.0F, x0, y1, 0.0F, textureMaxV, x1, y1, textureMaxU, textureMaxV,
     };
 
     const ShaderProgram& shader = m_shaders[lensBezierSamples(radiusPx) == 10 ? 0 : 1];
@@ -110,6 +104,20 @@ bool LensRenderer::draw(const LensRenderParams& params) {
     glUniform2f(shader.textureMax, textureMaxU, textureMaxV);
     glUniform2f(shader.center, centerU, centerV);
     glUniform2f(shader.velocity, params.velocityX, params.velocityY);
+    glUniform2fv(shader.pullAxis, 1, params.pullAxis.data());
+    const float wobbleGain = params.pinned ? std::clamp(params.style.interactionBounce, 0.0F, 2.5F) : 1.0F;
+    const float wobble = std::clamp(params.wobble * wobbleGain, -1.0F, 1.0F);
+    if (params.pinned) {
+        const double motion = std::clamp(static_cast<double>(params.style.motionStrength), 0.0, 2.5);
+        const double radius =
+            radiusPx * (0.82 + 0.18 * params.reveal) * (1.0 + static_cast<double>(wobble) * motion * 0.020);
+        const double axisLength = std::max(std::hypot(params.pullAxis[0], params.pullAxis[1]), 0.001F);
+        const double strain = (params.trailNodes[4] * params.pullAxis[0] + params.trailNodes[5] * params.pullAxis[1]) *
+                              motion / (radius * axisLength);
+        const PinnedShape shape = pinnedShape(strain, params.pullShare);
+        glUniform3f(shader.pullShape, static_cast<float>(shape.bodyRadius), static_cast<float>(shape.pullRadius),
+                    static_cast<float>(shape.separation));
+    }
     glUniform2fv(shader.trail, 3, params.trailNodes.data());
     glUniform1f(shader.radius, radiusPx);
     glUniform1f(shader.zoom, std::max(params.style.zoom, LensLimits::ZOOM_MIN));
@@ -117,16 +125,20 @@ bool LensRenderer::draw(const LensRenderParams& params) {
     glUniform1f(shader.strength, std::max(params.style.refraction, LensLimits::REFRACTION_MIN));
     glUniform1f(shader.dispersion, std::max(params.style.dispersion, LensLimits::DISPERSION_MIN));
     glUniform1f(shader.reveal, std::clamp(params.reveal, 0.0F, 1.0F));
-    glUniform1f(shader.wobble, std::clamp(params.wobble, -1.0F, 1.0F));
-    glUniform1f(shader.motionStrength,
-                std::clamp(params.style.motionStrength, LensLimits::MOTION_STRENGTH_MIN,
-                           LensLimits::MOTION_STRENGTH_MAX));
-    glUniform1f(shader.bulge,
-                std::clamp(params.style.bulge, LensLimits::BULGE_MIN, LensLimits::BULGE_MAX));
+    glUniform1f(shader.wobble, wobble);
+    const double interaction = params.pinned
+                                   ? params.interactionWobble * std::clamp(params.style.interactionBounce, 0.0F, 2.5F) *
+                                         std::clamp(params.style.motionStrength, 0.0F, 2.5F) / 1.5
+                                   : 0.0;
+    glUniform1f(shader.interactionStretch, static_cast<float>(std::exp(0.28 * std::tanh(interaction))));
+    glUniform1f(shader.pinned, params.pinned ? 1.0F : 0.0F);
+    glUniform1f(shader.motionStrength, std::clamp(params.style.motionStrength, LensLimits::MOTION_STRENGTH_MIN,
+                                                  LensLimits::MOTION_STRENGTH_MAX));
+    glUniform1f(shader.bulge, std::clamp(params.style.bulge, LensLimits::BULGE_MIN, LensLimits::BULGE_MAX));
     glUniform1f(shader.edgeWidth, std::max(edgeWidthPx, LensLimits::EDGE_WIDTH_MIN));
     glUniform1f(shader.edgeStrength, std::max(params.style.edgeStrength, LensLimits::EDGE_STRENGTH_MIN));
-    glUniform1f(shader.colorStrength, std::clamp(params.style.colorStrength,
-        LensLimits::COLOR_STRENGTH_MIN, LensLimits::COLOR_STRENGTH_MAX));
+    glUniform1f(shader.colorStrength,
+                std::clamp(params.style.colorStrength, LensLimits::COLOR_STRENGTH_MIN, LensLimits::COLOR_STRENGTH_MAX));
     glUniform1f(shader.colorWidth, params.style.colorWidth * params.scale);
     glUniform4fv(shader.transmissionColor, 1, params.style.colors.transmission.data());
     glUniform4fv(shader.refractionColor, 1, params.style.colors.refraction.data());

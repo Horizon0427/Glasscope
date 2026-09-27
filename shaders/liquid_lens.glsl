@@ -16,6 +16,8 @@ uniform vec2  uResolution;
 uniform vec2  uTextureMax;
 uniform vec2  uCenter;
 uniform vec2  uVelocity;
+uniform vec2  uPullAxis;
+uniform vec3  uPullShape;
 uniform vec2  uTrailNodes[3];
 uniform float uRadiusPx;
 uniform float uZoom;
@@ -24,6 +26,8 @@ uniform float uStrength;
 uniform float uDispersion;
 uniform float uReveal;
 uniform float uWobble;
+uniform float uInteractionStretch;
+uniform float uPinned;
 uniform float uMotionStrength;
 uniform float uBulge;
 uniform float uEdgeWidthPx;
@@ -98,7 +102,7 @@ void prepareLens(out float motionStrength, out float rawSpeed,
 
     maximumTrailLength = max(length(nodes[1]),
                              max(length(nodes[2]), length(nodes[3])));
-    float maximumAllowedLength = radius * 1.35;
+    float maximumAllowedLength = radius * (uPinned > 0.5 ? 2.6 : 1.35);
     if (maximumTrailLength > maximumAllowedLength) {
         float trailScale = maximumAllowedLength / maximumTrailLength;
         nodes[1] *= trailScale;
@@ -119,12 +123,32 @@ float lensDistance(vec2 point, float motionStrength, float rawSpeed,
                      (rawSpeed > 0.0001 ? normalize(uVelocity) :
                                           vec2(1.0, 0.0));
     vec2 perpendicular = vec2(-direction.y, direction.x);
+    if (uPinned > 0.5) {
+        direction = uPullAxis / max(length(uPullAxis), 0.001);
+        perpendicular = vec2(-direction.y, direction.x);
+    }
     float along = dot(point, direction);
     float across = dot(point, perpendicular);
     float restDrop = circleDistance(point, vec2(0.0), radius);
 
     float distance = restDrop;
-    if (trailActivation > 0.0005) {
+    if (uPinned > 0.5) {
+        float interactionStretch = max(uInteractionStretch, 0.001);
+        vec2 local = vec2(along / interactionStretch, across * interactionStretch) / radius;
+        // Keep the field-to-distance conversion identical to pinnedDistance().
+        vec2 pulled = local - vec2(uPullShape.z, 0.0);
+        float bodySquared = max(dot(local, local), 1e-8);
+        float pullSquared = max(dot(pulled, pulled), 1e-8);
+        float bodyField = uPullShape.x * uPullShape.x / bodySquared;
+        float pullField = uPullShape.y * uPullShape.y / pullSquared;
+        float field = max(bodyField + pullField, 1e-12);
+        float inverseRoot = inversesqrt(field);
+        vec2 gradient = bodyField * local / bodySquared + pullField * pulled / pullSquared;
+        float slope = length(gradient) * inverseRoot / field;
+        float fieldScale = max(length(uPullShape.xy), 0.001);
+        distance = radius * (inverseRoot - 1.0) / max(slope, 0.2 / fieldScale) *
+                   min(interactionStretch, 1.0 / interactionStretch);
+    } else if (uPinned < 0.5 && trailActivation > 0.0005) {
         float slimeDrop = 100000.0;
         int sampleCount = GLASSCOPE_BEZIER_SAMPLES;
         for (int index = 0; index < GLASSCOPE_BEZIER_SAMPLES; ++index) {
@@ -174,7 +198,7 @@ void main() {
     prepareLens(motionStrength, rawSpeed, signedBounce, radius, nodes,
                 maximumTrailLength);
 
-    float conservativeOuterRadius = maximumTrailLength + radius * 1.20 + 2.0;
+    float conservativeOuterRadius = maximumTrailLength + radius * 1.40 + 2.0;
     if (length(pixelPoint) > conservativeOuterRadius) {
         outColor = vec4(0.0);
         return;
@@ -190,6 +214,15 @@ void main() {
     float antialias = 1.75;
     float mask = 1.0 - smoothstep(-antialias, antialias, distance);
     float edgeWidth = max(uEdgeWidthPx, 4.0);
+    float stretch = 1.0 - exp(-maximumTrailLength / max(radius, 1.0) * 2.4);
+    vec2 flowAxis = -nodes[1] / max(length(nodes[1]), 0.5);
+    float leading = dot(normal, flowAxis);
+    float tailDepth = clamp(-dot(pixelPoint, flowAxis) / max(radius, 1.0),
+                            0.0, 1.5) / 1.5;
+    float compression = signedBounce * motionStrength;
+    float thickness = clamp(1.0 + stretch * (leading * 0.20 - tailDepth * 0.22) +
+                             compression * 0.15, 0.62, 1.28);
+    float opticalWidth = edgeWidth * thickness;
     float rimWide = 1.0 - smoothstep(0.5, edgeWidth, abs(distance));
     float rimCore = 1.0 - smoothstep(0.25, max(2.0, edgeWidth * 0.20),
                                       abs(distance));
@@ -209,7 +242,7 @@ void main() {
     float centerSafety = smoothstep(0.035, 0.16, radial);
     float edgeRefraction = (rimWide * 9.0 + rimCore * 8.0 +
                             innerShell * 2.8) *
-                           uStrength * uEdgeStrength;
+                           uStrength * uEdgeStrength * thickness;
     vec2 refraction = normal / uResolution * edgeRefraction * centerSafety;
 
     vec2 tangent = vec2(-normal.y, normal.x);
@@ -220,7 +253,7 @@ void main() {
     vec3 base = texture(uTexture, sampleUv).rgb;
     float sourceLuminance = perceptualLuminance(base);
 
-    float spectralWidth = rimWide * 3.7 + rimCore * 2.6;
+    float spectralWidth = (rimWide * 3.7 + rimCore * 2.6) * thickness;
     vec2 spectralOffset = normal / uResolution * spectralWidth *
                           uDispersion * uEdgeStrength * centerSafety;
     vec3 refracted = base;
@@ -268,13 +301,45 @@ void main() {
         highlightColor = mix(highlightColor, clamp(uHighlightColor.rgb, 0.0, 1.0),
                              colorStrength * clamp(uHighlightColor.a, 0.0, 1.0));
     }
+    float surfaceActivity = clamp(stretch * 0.75 +
+                                   abs(compression) * 0.65, 0.0, 1.0);
+    float filamentWidth = max(1.0 * uScale, opticalWidth * 0.052);
+    float filamentDepth = opticalWidth * (0.10 + surfaceActivity * 0.055);
+    float filament = 1.0 - smoothstep(filamentWidth * 0.25, filamentWidth,
+                                      abs(distance + filamentDepth));
+    float secondaryDepth = filamentDepth + opticalWidth *
+                           (0.12 + surfaceActivity * 0.15);
+    float secondary = 1.0 - smoothstep(filamentWidth * 0.35,
+                                       filamentWidth * 1.35,
+                                       abs(distance + secondaryDepth));
+    vec2 secondaryLight = normalize(lightDirection +
+                                    vec2(-lightDirection.y, lightDirection.x) *
+                                    (0.16 + surfaceActivity * 0.20));
+    float secondaryFacing = max(dot(-normal, secondaryLight), 0.0);
     float highlight = pow(lightFacing, 4.0) *
-                      (rimCore * 0.75 + innerShell * 0.32);
+                      (rimCore * 0.52 + innerShell * 0.24) +
+                      pow(lightFacing, 12.0) * filament * 0.68 +
+                      pow(secondaryFacing, 20.0) * secondary *
+                      (0.16 + surfaceActivity * 0.30);
     float innerShade = pow(max(dot(normal, lightDirection), 0.0), 2.0) *
                        innerShell;
     refracted *= 1.0 - innerShade * 0.10 * uEdgeStrength;
     refracted += highlightColor * highlight *
                  0.42 * uEdgeStrength;
+
+    float gatherDepth = opticalWidth * (0.60 + compression * 0.08);
+    float gatherWidth = max(1.2 * uScale, opticalWidth * 0.10);
+    float gatheredLight = 1.0 - smoothstep(gatherWidth * 0.2, gatherWidth,
+                                          abs(distance + gatherDepth));
+    float gatheredShade = 1.0 - smoothstep(gatherWidth * 0.4,
+                                          gatherWidth * 1.8,
+                                          abs(distance + gatherDepth +
+                                              gatherWidth * 1.8));
+    float backLight = pow(max(dot(normal, lightDirection), 0.0), 6.0);
+    float gatherAmount = backLight * (0.032 + surfaceActivity * 0.05) *
+                         thickness * uStrength * uEdgeStrength;
+    refracted *= 1.0 - gatheredShade * gatherAmount * 0.65;
+    refracted += highlightColor * gatheredLight * gatherAmount;
 
     float probeAmount = clamp(uColorProbeAmount, 0.0, 1.0);
     if (probeAmount > 0.001) {
