@@ -3,7 +3,7 @@
 A liquid-glass magnifier and RGB colour picker for Hyprland. Follow the pointer
 or pin a live lens in place to inspect details on your desktop.
 
-[Watch the demo](assets/glasscope-demo.mp4)
+https://github.com/user-attachments/assets/f55f0095-4e23-4923-bee5-b4598ca9c9a0
 
 - Adjustable magnification and lens size.
 - Liquid motion, click feedback and elastic surface dragging.
