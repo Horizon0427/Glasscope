@@ -23,7 +23,7 @@ cmake -E rm -f "$output"
 cmake -E remove_directory "$build_dir"
 cmake -E make_directory "$build_dir" "$dist_dir"
 
-cmake -S "$repo_dir" -B "$build_dir" -DCMAKE_BUILD_TYPE=Release
+cmake -S "$repo_dir" -B "$build_dir" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
 cmake --build "$build_dir" --parallel "$jobs"
 
 artifact="$build_dir/glasscope.so"
