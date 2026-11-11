@@ -34,11 +34,11 @@ class LensPassElement final : public IPassElement {
   public:
     LensPassElement(LensRenderer& renderer, LensPassData data);
 
-    std::vector<UP<IPassElement>> draw() override;
-    bool needsLiveBlur() override;
-    bool needsPrecomputeBlur() override;
-    std::optional<CBox> boundingBox() override;
-    CRegion opaqueRegion() override;
+    std::vector<UP<IPassElement>> draw(Render::CRenderContext& ctx) override;
+    bool needsLiveBlur(Render::CRenderContext& ctx) override;
+    bool needsPrecomputeBlur(Render::CRenderContext& ctx) override;
+    std::optional<CBox> boundingBox(Render::CRenderContext& ctx) override;
+    CRegion opaqueRegion(Render::CRenderContext& ctx) override;
     const char* passName() override;
     ePassElementType type() override;
 

@@ -4,8 +4,10 @@
 #include "hyprland/coordinates.hpp"
 #include "hyprland/lens_pass_element.hpp"
 #include "hyprland/notification.hpp"
+#include <hyprland/src/render/Context.hpp>
 #include <hyprland/src/render/OpenGL.hpp>
 #include <hyprland/src/render/Renderer.hpp>
+#include <hyprland/src/render/pass/Pass.hpp>
 #include <hyprland/src/state/MonitorState.hpp>
 namespace Glasscope {
 namespace {
@@ -14,8 +16,8 @@ CBox lensBounds(Vec2 center, const std::array<Vec2, 3>& trail, const LensStyle& 
     return {center.x - extent, center.y - extent, extent * 2.0, extent * 2.0};
 }
 }
-bool RenderDriver::beginFrame() {
-    if (!g_pHyprRenderer->m_renderData.pMonitor.lock())
+bool RenderDriver::beginFrame(Render::CRenderContext& ctx) {
+    if (!ctx.m_data.pMonitor.lock())
         return false;
     if (m_releaseRequested) {
         m_renderer.destroy();
@@ -23,8 +25,8 @@ bool RenderDriver::beginFrame() {
     }
     return true;
 }
-FrameTarget RenderDriver::target(const LensSnapshot& snapshot) {
-    const auto monitor = g_pHyprRenderer->m_renderData.pMonitor.lock();
+FrameTarget RenderDriver::target(const LensSnapshot& snapshot, Render::CRenderContext& ctx) {
+    const auto monitor = ctx.m_data.pMonitor.lock();
     const auto owner = State::monitorState()->query().vec(toHypr(snapshot.center)).run();
     if (!owner || owner != monitor)
         return FrameTarget::OtherOutput;
@@ -67,27 +69,31 @@ void RenderDriver::transition(const LensSnapshot& before, const LensSnapshot& af
         damage(after, style);
 }
 void RenderDriver::deferRelease() {
-    if (g_pHyprRenderer)
-        g_pHyprRenderer->currentPass().removeAllOfType("CGlasscopeLensPassElement");
+    removePassElements();
     m_releaseRequested = true;
 }
 void RenderDriver::shutdown() {
-    if (g_pHyprRenderer)
-        g_pHyprRenderer->currentPass().removeAllOfType("CGlasscopeLensPassElement");
+    removePassElements();
     if (Render::GL::g_pHyprOpenGL) {
         Render::GL::g_pHyprOpenGL->makeEGLCurrent();
         m_renderer.destroy();
     }
 }
+// The pass lives on the renderer's context in 0.57; outside a session it is empty.
+void RenderDriver::removePassElements() {
+    if (!g_pHyprRenderer)
+        return;
+    Render::IHyprRenderer::currentPass(g_pHyprRenderer->context()).removeAllOfType("CGlasscopeLensPassElement");
+}
 void RenderDriver::draw(const LensSnapshot& snapshot, const LensStyle& style, const ProbeVisual& probe, bool animate,
-                        std::function<void(ColorSample)> onCapture) {
+                        std::function<void(ColorSample)> onCapture, Render::CRenderContext& ctx) {
     if (animate)
         damage(snapshot, style);
     if (snapshot.reveal <= 0.001) {
         m_renderer.releaseCopyTexture();
         return;
     }
-    const auto monitor = g_pHyprRenderer->m_renderData.pMonitor.lock();
+    const auto monitor = ctx.m_data.pMonitor.lock();
     if (!monitor)
         return;
     const Vector2D centerGlobal = toHypr(snapshot.center);
@@ -95,15 +101,16 @@ void RenderDriver::draw(const LensSnapshot& snapshot, const LensStyle& style, co
     CBox physicalLensBounds = lensBounds(snapshot.center, snapshot.trailNodes, style);
     physicalLensBounds.translate(-monitor->m_position).scale(monitor->m_scale).round();
 
-    CRegion intersectingDamage = g_pHyprRenderer->m_renderData.damage.copy();
+    CRegion intersectingDamage = ctx.m_data.damage.copy();
     intersectingDamage.intersect(physicalLensBounds);
     if (intersectingDamage.empty())
         return;
 
-    g_pHyprRenderer->m_renderData.damage.add(physicalLensBounds);
+    ctx.m_data.damage.add(physicalLensBounds);
     monitor->m_damage.damage(physicalLensBounds);
 
-    g_pHyprRenderer->addPassElement(
+    Render::IHyprRenderer::addPassElement(
+        ctx,
         makeUnique<LensPassElement>(m_renderer, LensPassData{
                                                     .monitor = monitor,
                                                     .centerLocal = centerLocal,
