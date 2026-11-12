@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/f55f0095-4e23-4923-bee5-b4598ca9c9a0
 
 ## Requirements
 
-Developed and tested with **Hyprland 0.56.2 and Lua configuration**.
+Developed and tested with **Hyprland 0.57.1 and Lua configuration**.
 
 - Hyprland development headers matching the running compositor.
 - CMake 3.25+, a C++23 compiler, pkg-config, GLESv2 and Lua development files.
@@ -196,6 +196,8 @@ end)
 Dispatcher names are `glasscope:toggle`, `glasscope:show`, `glasscope:hide`,
 `glasscope:toggle-pin`, `glasscope:begin-color-probe`, `glasscope:pick-color` and
 `glasscope:cancel-color-probe`. Use the Lua functions in Lua configuration.
+Dispatcher registration is best effort: Hyprland 0.57 stubs the plugin dispatcher
+API, so the Lua functions above are the only entry point there.
 
 </details>
 

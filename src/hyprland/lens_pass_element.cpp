@@ -12,7 +12,7 @@ namespace Glasscope {
 LensPassElement::LensPassElement(LensRenderer& renderer, LensPassData data)
     : m_renderer(renderer), m_data(std::move(data)) {}
 
-std::vector<UP<IPassElement>> LensPassElement::draw() {
+std::vector<UP<IPassElement>> LensPassElement::draw(Render::CRenderContext&) {
     const auto monitor = m_data.monitor.lock();
     if (!monitor || monitor->m_transform != WL_OUTPUT_TRANSFORM_NORMAL)
         return {};
@@ -54,15 +54,15 @@ std::vector<UP<IPassElement>> LensPassElement::draw() {
     return {};
 }
 
-bool LensPassElement::needsLiveBlur() {
+bool LensPassElement::needsLiveBlur(Render::CRenderContext&) {
     return false;
 }
 
-bool LensPassElement::needsPrecomputeBlur() {
+bool LensPassElement::needsPrecomputeBlur(Render::CRenderContext&) {
     return false;
 }
 
-std::optional<CBox> LensPassElement::boundingBox() {
+std::optional<CBox> LensPassElement::boundingBox(Render::CRenderContext&) {
     const std::array<Vec2, 3> trail{fromHypr(m_data.trailNodes[0]), fromHypr(m_data.trailNodes[1]),
                                     fromHypr(m_data.trailNodes[2])};
     const double extent = lensExtent(m_data.style, m_data.style.radius, m_data.style.edgeWidth, trail);
@@ -74,7 +74,7 @@ std::optional<CBox> LensPassElement::boundingBox() {
     };
 }
 
-CRegion LensPassElement::opaqueRegion() {
+CRegion LensPassElement::opaqueRegion(Render::CRenderContext&) {
     return {};
 }
 

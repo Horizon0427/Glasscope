@@ -117,9 +117,11 @@ void unregisterBindings(HANDLE handle) {
 }
 
 void registerBindings(HANDLE handle) {
+    // Hyprland 0.57 stubs out the dispatcher API (addDispatcherV2 always returns
+    // false), so registration stays best effort: the Lua functions below are the
+    // supported entry point there.
     const auto addDispatcher = [handle](const std::string& name, auto callback) {
-        if (!HyprlandAPI::addDispatcherV2(handle, name, callback))
-            throw std::runtime_error("glasscope: failed to register dispatcher " + name);
+        HyprlandAPI::addDispatcherV2(handle, name, callback);
     };
 
     addDispatcher("glasscope:toggle", [](const std::string&) {

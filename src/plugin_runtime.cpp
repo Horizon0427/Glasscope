@@ -206,9 +206,9 @@ struct PluginRuntime::Impl {
         else if (result.changed)
             transition(before);
     }
-    void onFrame() {
+    void onFrame(Render::CRenderContext& ctx) {
         syncEnabled();
-        if (!m_render.beginFrame())
+        if (!m_render.beginFrame(ctx))
             return;
         const double now = nowSeconds();
         if (sessionLocked()) {
@@ -227,7 +227,7 @@ struct PluginRuntime::Impl {
             m_render.deferRelease();
             return;
         }
-        const auto target = m_render.target(m_state.snapshot());
+        const auto target = m_render.target(m_state.snapshot(), ctx);
         if (target == FrameTarget::Unsupported && (m_probe.aiming() || m_probe.capturePending()))
             clearColorProbe();
         if (target != FrameTarget::Ready)
@@ -243,7 +243,7 @@ struct PluginRuntime::Impl {
                 damage();
             };
         m_render.draw(m_state.snapshot(), currentConfig().style, m_probe.visual(now),
-                      m_state.needsAnimation() || m_probe.feedbackAmount(now) > 0.0F, std::move(capture));
+                      m_state.needsAnimation() || m_probe.feedbackAmount(now) > 0.0F, std::move(capture), ctx);
     }
     void registerListeners() {
         m_pointerListener = Event::bus()->m_events.input.mouse.move.listen(
@@ -254,9 +254,11 @@ struct PluginRuntime::Impl {
             if (m_probe.aiming())
                 m_cursor.update(true);
         });
-        m_renderListener = Event::bus()->m_events.render.stage.listen([this](eRenderStage stage) {
-            if (stage == RENDER_LAST_MOMENT)
-                onFrame();
+        m_renderListener = Event::bus()->m_events.render.stage.listen([this](const Event::SRenderStageEvent& event) {
+            // The context is only borrowed during the emission and absent on POST stages.
+            if (event.stage != RENDER_LAST_MOMENT || !event.context)
+                return;
+            onFrame(event.context->get());
         });
         m_configReloadListener = Event::bus()->m_events.config.reloaded.listen([this] {
             const auto before = currentConfig();

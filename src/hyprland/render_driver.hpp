@@ -5,26 +5,31 @@
 #include "render/lens_renderer.hpp"
 #include <functional>
 #include <hyprland/src/plugins/PluginAPI.hpp>
+namespace Render {
+class CRenderContext;
+}
 namespace Glasscope {
 enum class FrameTarget { OtherOutput, Unsupported, Ready };
 class RenderDriver {
   public:
     explicit RenderDriver(HANDLE handle) : m_handle(handle) {}
-    bool beginFrame();
-    FrameTarget target(const LensSnapshot& snapshot);
+    bool beginFrame(Render::CRenderContext& ctx);
+    FrameTarget target(const LensSnapshot& snapshot, Render::CRenderContext& ctx);
     bool consumeFailure();
     [[nodiscard]] bool available() const {
         return !m_disabled;
     }
     bool acceptsPress(Vec2 cursor, const LensSnapshot& snapshot, const LensStyle& style, bool probeBlocked) const;
     void draw(const LensSnapshot& snapshot, const LensStyle& style, const ProbeVisual& probe, bool animate,
-              std::function<void(ColorSample)> onCapture);
+              std::function<void(ColorSample)> onCapture, Render::CRenderContext& ctx);
     void damage(const LensSnapshot& snapshot, const LensStyle& style) const;
     void transition(const LensSnapshot& before, const LensSnapshot& after, const LensStyle& style) const;
     void deferRelease();
     void shutdown();
 
   private:
+    void removePassElements();
+
     HANDLE m_handle;
     LensRenderer m_renderer;
     bool m_disabled = false;
