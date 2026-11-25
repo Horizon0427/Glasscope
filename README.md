@@ -132,6 +132,14 @@ Open the lens before pinning, picking colours or adjusting its parameters.
 surface and release to let it spring back. The lens stays anchored and the view
 remains live.
 
+**Stretch into a pill:** while pinned, press on the lens and drag. A short pull is the
+usual jelly effect and springs back on release. Pull further (about 1.5 lens
+radii from where you pressed) and the lens snaps into a pill that follows the
+pointer. Drag either end of a pill to change its length and direction; the
+direction snaps to horizontal or vertical when it is within a few degrees. The
+whole pill ripples and trails as one body while it moves. Hiding and showing the
+lens again returns it to a circle.
+
 **Pick a colour:** aim the crosshair and left-click to copy `rgb(R, G, B)` to the
 clipboard. Picking temporarily follows the pointer, then restores the previous
 pin after confirmation or cancellation. The lens stays open until you hide it.

@@ -79,7 +79,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         "glasscope",
         "An interactive liquid-glass magnifier for Hyprland",
         "horizon",
-        "0.7.0",
+        "0.8.0",
     };
 }
 

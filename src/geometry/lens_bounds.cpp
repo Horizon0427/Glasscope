@@ -1,5 +1,6 @@
 #include "glasscope/geometry/lens_bounds.hpp"
 #include <algorithm>
+#include <cmath>
 namespace Glasscope {
 double lensExtent(const LensGeometry& geometry) noexcept {
     const double trailLength = std::min(geometry.maximumTrailLength * geometry.motionStrength, geometry.radius * 2.6);
@@ -32,5 +33,15 @@ double lensExtent(const LensStyle& style, double radius, double edgeWidth, const
     for (std::size_t i = 0; i < nodes.size(); i += 2)
         trail = std::max(trail, std::hypot(nodes[i], nodes[i + 1]));
     return extentWithTrail(style, radius, edgeWidth, trail);
+}
+LensExtents lensExtents(const LensStyle& style, double radius, double edgeWidth, const std::array<Vec2, 3>& nodes,
+                        Vec2 pillAxis) noexcept {
+    const double base = lensExtent(style, radius, edgeWidth, nodes);
+    return {base + std::abs(pillAxis.x), base + std::abs(pillAxis.y)};
+}
+LensExtents lensExtents(const LensStyle& style, double radius, double edgeWidth, const std::array<float, 6>& nodes,
+                        const std::array<float, 2>& pillAxis) noexcept {
+    const double base = lensExtent(style, radius, edgeWidth, nodes);
+    return {base + std::abs(static_cast<double>(pillAxis[0])), base + std::abs(static_cast<double>(pillAxis[1]))};
 }
 }

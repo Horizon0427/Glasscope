@@ -17,6 +17,7 @@ struct ShaderProgram {
     GLint center = -1;
     GLint velocity = -1;
     GLint pullAxis = -1;
+    GLint pillAxis = -1;
     GLint pullShape = -1;
     GLint trail = -1;
     GLint radius = -1;

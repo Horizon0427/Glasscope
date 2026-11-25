@@ -59,8 +59,10 @@ float followingLensDistance(vec2 point, vec2 nodes[4], float radius, float restD
             float materialRadius = radius * clamp(
                 0.22 + 0.76 / (1.0 + localStretch * 0.98),
                 0.22, 0.96);
-            float sampleDrop = circleDistance(point, materialPoint,
-                                              materialRadius);
+            // The whole pill is dragged along the trail (not just its end caps), so
+            // the sides lag and thin out exactly like the ends do.
+            float sampleDrop = pillDistance(point - materialPoint,
+                                            materialRadius);
             slimeDrop = smoothMinimum(slimeDrop, sampleDrop,
                                       radius * 0.065);
         }

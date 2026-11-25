@@ -4,6 +4,7 @@
 #include "glasscope/core/lens_oscillation.hpp"
 #include "glasscope/model/lens_snapshot.hpp"
 
+#include "glasscope/core/pill_shape.hpp"
 #include "glasscope/core/pinned_interaction.hpp"
 #include "glasscope/core/visibility.hpp"
 #include <array>
@@ -31,6 +32,7 @@ class LensState {
     LensMotion m_motion;
     LensOscillation m_oscillation;
     PinnedInteraction m_interaction;
+    PillShape m_pill;
     Visibility m_visibility;
     double m_phase = 0.0;
     double m_lastUpdate = 0.0;

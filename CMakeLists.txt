@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(glasscope VERSION 0.7.0 LANGUAGES CXX)
+project(glasscope VERSION 0.8.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -23,6 +23,7 @@ add_library(glasscope-core STATIC
   src/core/lens_oscillation.cpp
   src/core/lens_state.cpp
   src/core/pinned_interaction.cpp
+  src/core/pill_shape.cpp
   src/core/visibility.cpp
   src/core/color_probe.cpp
   src/core/input_router.cpp

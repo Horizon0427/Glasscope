@@ -13,9 +13,10 @@ float lensDistance(vec2 point, float motionStrength, float rawSpeed,
         direction = uPullAxis / max(length(uPullAxis), 0.001);
         perpendicular = vec2(-direction.y, direction.x);
     }
-    float along = dot(point, direction);
-    float across = dot(point, perpendicular);
-    float restDrop = circleDistance(point, vec2(0.0), radius);
+    vec2 body = pillLocal(point);
+    float along = dot(body, direction);
+    float across = dot(body, perpendicular);
+    float restDrop = pillDistance(point, radius);
 
     float distance = restDrop;
     if (uPinned > 0.5) {
@@ -28,7 +29,15 @@ float lensDistance(vec2 point, float motionStrength, float rawSpeed,
                                 abs(uWobble) * motionStrength * 0.34,
                                 0.0, 1.35);
     float axisAngle = atan(across, along);
-    float flowRipple = sin(axisAngle * 3.0 + along / radius * 1.7 -
+    float travel = dot(point, direction);
+    if (length(uPillAxis) > 0.5) {
+        // Angle around the whole pill outline, expressed in the flow frame.
+        vec2 pillDirection = normalize(uPillAxis);
+        float pillInFlow = atan(dot(pillDirection, perpendicular),
+                                dot(pillDirection, direction));
+        axisAngle = pillOutlineAngle(point, radius) + pillInFlow;
+    }
+    float flowRipple = sin(axisAngle * 3.0 + travel / radius * 1.7 -
                            uTime * 5.2) * 0.008 +
                        sin(axisAngle * 5.0 + uTime * 3.8) * 0.004;
     distance -= radius * flowRipple * surfaceEnergy;

@@ -39,6 +39,7 @@ std::vector<UP<IPassElement>> LensPassElement::draw(Render::CRenderContext&) {
         .velocityY = std::clamp(static_cast<float>(m_data.velocity.y) * speedScale, -1.0F, 1.0F),
         .pullAxis = {static_cast<float>(m_data.pullAxis.x), static_cast<float>(m_data.pullAxis.y)},
         .trailNodes = trailNodes,
+        .pillAxis = {static_cast<float>(m_data.pillAxis.x) * scale, static_cast<float>(m_data.pillAxis.y) * scale},
         .reveal = m_data.reveal,
         .wobble = m_data.wobble,
         .interactionWobble = m_data.interactionWobble,
@@ -65,12 +66,13 @@ bool LensPassElement::needsPrecomputeBlur(Render::CRenderContext&) {
 std::optional<CBox> LensPassElement::boundingBox(Render::CRenderContext&) {
     const std::array<Vec2, 3> trail{fromHypr(m_data.trailNodes[0]), fromHypr(m_data.trailNodes[1]),
                                     fromHypr(m_data.trailNodes[2])};
-    const double extent = lensExtent(m_data.style, m_data.style.radius, m_data.style.edgeWidth, trail);
+    const LensExtents extents =
+        lensExtents(m_data.style, m_data.style.radius, m_data.style.edgeWidth, trail, fromHypr(m_data.pillAxis));
     return CBox{
-        m_data.centerLocal.x - extent,
-        m_data.centerLocal.y - extent,
-        extent * 2.0,
-        extent * 2.0,
+        m_data.centerLocal.x - extents.x,
+        m_data.centerLocal.y - extents.y,
+        extents.x * 2.0,
+        extents.y * 2.0,
     };
 }
 

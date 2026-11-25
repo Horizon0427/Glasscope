@@ -21,7 +21,8 @@ vec3 lensOptics(vec2 pixelPoint, float distance, float radius, float signedBounc
     float stretch = 1.0 - exp(-maximumTrailLength / max(radius, 1.0) * 2.4);
     vec2 flowAxis = -nodes[1] / max(length(nodes[1]), 0.5);
     float leading = dot(normal, flowAxis);
-    float tailDepth = clamp(-dot(pixelPoint, flowAxis) / max(radius, 1.0),
+    vec2 body = pillLocal(pixelPoint);
+    float tailDepth = clamp(-dot(body, flowAxis) / max(radius, 1.0),
                             0.0, 1.5) / 1.5;
     float compression = signedBounce * motionStrength;
     float thickness = clamp(1.0 + stretch * (leading * 0.20 - tailDepth * 0.22) +
@@ -36,7 +37,7 @@ vec3 lensOptics(vec2 pixelPoint, float distance, float radius, float signedBounc
                                          edgeWidth * 0.28, distance));
 
     float revealRadius = uRadiusPx * mix(0.82, 1.0, uReveal);
-    float radial = clamp(length(pixelPoint) / max(revealRadius, 1.0),
+    float radial = clamp(length(body) / max(revealRadius, 1.0),
                          0.0, 1.0);
     float dome = 1.0 - radial * radial;
     float domeScale = 1.0 - clamp(uBulge, 0.0, 0.28) * dome;

@@ -17,6 +17,7 @@ struct LensSnapshot {
     double phase = 0.0;
     bool requestedVisible = false;
     bool pinned = false;
+    Vec2 pillAxis; // half-length vector of the pill (logical px); zero for the round lens
 };
 
 }
