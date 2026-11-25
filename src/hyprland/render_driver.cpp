@@ -11,9 +11,9 @@
 #include <hyprland/src/state/MonitorState.hpp>
 namespace Glasscope {
 namespace {
-CBox lensBounds(Vec2 center, const std::array<Vec2, 3>& trail, const LensStyle& style) {
-    const double extent = lensExtent(style, style.radius, style.edgeWidth, trail);
-    return {center.x - extent, center.y - extent, extent * 2.0, extent * 2.0};
+CBox lensBounds(Vec2 center, const std::array<Vec2, 3>& trail, Vec2 pillAxis, const LensStyle& style) {
+    const LensExtents extents = lensExtents(style, style.radius, style.edgeWidth, trail, pillAxis);
+    return {center.x - extents.x, center.y - extents.y, extents.x * 2.0, extents.y * 2.0};
 }
 }
 bool RenderDriver::beginFrame(Render::CRenderContext& ctx) {
@@ -60,7 +60,7 @@ bool RenderDriver::acceptsPress(Vec2 cursor, const LensSnapshot& snapshot, const
 }
 void RenderDriver::damage(const LensSnapshot& snapshot, const LensStyle& style) const {
     if (g_pHyprRenderer)
-        g_pHyprRenderer->damageBox(lensBounds(snapshot.center, snapshot.trailNodes, style));
+        g_pHyprRenderer->damageBox(lensBounds(snapshot.center, snapshot.trailNodes, snapshot.pillAxis, style));
 }
 void RenderDriver::transition(const LensSnapshot& before, const LensSnapshot& after, const LensStyle& style) const {
     if (before.reveal > 0.001 || before.requestedVisible)
@@ -98,7 +98,7 @@ void RenderDriver::draw(const LensSnapshot& snapshot, const LensStyle& style, co
         return;
     const Vector2D centerGlobal = toHypr(snapshot.center);
     const Vector2D centerLocal = centerGlobal - monitor->m_position;
-    CBox physicalLensBounds = lensBounds(snapshot.center, snapshot.trailNodes, style);
+    CBox physicalLensBounds = lensBounds(snapshot.center, snapshot.trailNodes, snapshot.pillAxis, style);
     physicalLensBounds.translate(-monitor->m_position).scale(monitor->m_scale).round();
 
     CRegion intersectingDamage = ctx.m_data.damage.copy();
@@ -122,6 +122,7 @@ void RenderDriver::draw(const LensSnapshot& snapshot, const LensStyle& style, co
                                                             toHypr(snapshot.trailNodes[1]),
                                                             toHypr(snapshot.trailNodes[2]),
                                                         },
+                                                    .pillAxis = toHypr(snapshot.pillAxis),
                                                     .style = style,
                                                     .reveal = static_cast<float>(snapshot.reveal),
                                                     .wobble = static_cast<float>(snapshot.wobble),

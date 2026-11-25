@@ -23,6 +23,7 @@ add_library(glasscope-core STATIC
   src/core/lens_oscillation.cpp
   src/core/lens_state.cpp
   src/core/pinned_interaction.cpp
+  src/core/pill_shape.cpp
   src/core/visibility.cpp
   src/core/color_probe.cpp
   src/core/input_router.cpp

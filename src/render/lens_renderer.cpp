@@ -25,11 +25,13 @@ bool LensRenderer::draw(const LensRenderParams& params) {
     if (!initialize())
         return false;
 
-    const float extent = static_cast<float>(lensExtent(params.style, radiusPx, edgeWidthPx, params.trailNodes));
-    const int desiredLeft = static_cast<int>(std::floor(params.centerX - extent));
-    const int desiredRight = static_cast<int>(std::ceil(params.centerX + extent));
-    const int desiredTop = static_cast<int>(std::floor(params.centerY - extent));
-    const int desiredBottom = static_cast<int>(std::ceil(params.centerY + extent));
+    const LensExtents extents = lensExtents(params.style, radiusPx, edgeWidthPx, params.trailNodes, params.pillAxis);
+    const float extentX = static_cast<float>(extents.x);
+    const float extentY = static_cast<float>(extents.y);
+    const int desiredLeft = static_cast<int>(std::floor(params.centerX - extentX));
+    const int desiredRight = static_cast<int>(std::ceil(params.centerX + extentX));
+    const int desiredTop = static_cast<int>(std::floor(params.centerY - extentY));
+    const int desiredBottom = static_cast<int>(std::ceil(params.centerY + extentY));
 
     const int left = std::clamp(desiredLeft, 0, params.framebufferWidth);
     const int right = std::clamp(desiredRight, 0, params.framebufferWidth);
@@ -98,6 +100,7 @@ bool LensRenderer::draw(const LensRenderParams& params) {
     glUniform2f(shader.center, centerU, centerV);
     glUniform2f(shader.velocity, params.velocityX, params.velocityY);
     glUniform2fv(shader.pullAxis, 1, params.pullAxis.data());
+    glUniform2fv(shader.pillAxis, 1, params.pillAxis.data());
     const float wobbleGain = params.pinned ? std::clamp(params.style.interactionBounce, 0.0F, 2.5F) : 1.0F;
     const float wobble = std::clamp(params.wobble * wobbleGain, -1.0F, 1.0F);
     if (params.pinned) {

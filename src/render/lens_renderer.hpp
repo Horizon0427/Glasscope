@@ -25,6 +25,7 @@ struct LensRenderParams {
     float velocityY = 0.0F;
     std::array<float, 2> pullAxis = {1.0F, 0.0F};
     std::array<float, 6> trailNodes = {};
+    std::array<float, 2> pillAxis = {}; // half-length vector of the pill, physical px; zero = round lens
     float reveal = 1.0F;
     float wobble = 0.0F;
     float interactionWobble = 0.0F;

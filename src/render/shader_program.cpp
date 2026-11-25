@@ -61,6 +61,7 @@ bool ShaderProgram::initialize(GLuint vertexShader, int bezierSamples, std::stri
     center = glGetUniformLocation(program, "uCenter");
     velocity = glGetUniformLocation(program, "uVelocity");
     pullAxis = glGetUniformLocation(program, "uPullAxis");
+    pillAxis = glGetUniformLocation(program, "uPillAxis");
     pullShape = glGetUniformLocation(program, "uPullShape");
     trail = glGetUniformLocation(program, "uTrailNodes[0]");
     radius = glGetUniformLocation(program, "uRadiusPx");
@@ -87,7 +88,7 @@ bool ShaderProgram::initialize(GLuint vertexShader, int bezierSamples, std::stri
     colorProbeCaptured = glGetUniformLocation(program, "uColorProbeCaptured");
     colorProbeColor = glGetUniformLocation(program, "uColorProbeColor");
 
-    if (texture < 0 || resolution < 0 || textureMax < 0 || center < 0 || velocity < 0 || pullAxis < 0 ||
+    if (texture < 0 || resolution < 0 || textureMax < 0 || center < 0 || velocity < 0 || pullAxis < 0 || pillAxis < 0 ||
         pullShape < 0 || trail < 0 || radius < 0 || zoom < 0 || time < 0 || strength < 0 || dispersion < 0 ||
         reveal < 0 || wobble < 0 || interactionStretch < 0 || pinned < 0 || motionStrength < 0 || bulge < 0 ||
         edgeWidth < 0 || edgeStrength < 0) {

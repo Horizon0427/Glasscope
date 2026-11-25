@@ -16,6 +16,7 @@ struct LensPassData {
     Vector2D velocity;
     Vector2D pullAxis = {1.0, 0.0};
     std::array<Vector2D, 3> trailNodes;
+    Vector2D pillAxis; // half-length vector of the pill (logical px)
     LensStyle style;
     float reveal = 1.0F;
     float wobble = 0.0F;

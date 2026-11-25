@@ -25,6 +25,29 @@ double effectiveLensRadius(double radius, double reveal, double wobble, double m
     return radius * (0.82 + 0.18 * reveal) * (1.0 + wobble * motion * 0.020);
 }
 
+// One turn around the whole pill outline is 2 pi; equals atan2(u, t) for a circle.
+// Mirrors pillOutlineAngle() in the shader.
+double pillOutlineAngle(Vec2 point, double radius, Vec2 axis, double halfLength) noexcept {
+    const double pi = std::acos(-1.0);
+    const double t = point.x * axis.x + point.y * axis.y;
+    const double u = -point.x * axis.y + point.y * axis.x;
+    const double perimeter = 2.0 * pi * radius + 4.0 * halfLength;
+    double s;
+    if (t > halfLength) {
+        s = radius * std::atan2(u, t - halfLength);
+    } else if (t < -halfLength) {
+        double psi = std::atan2(u, t + halfLength);
+        if (psi < 0.0)
+            psi += 2.0 * pi;
+        s = radius * pi * 0.5 + 2.0 * halfLength + radius * (psi - pi * 0.5);
+    } else if (u >= 0.0) {
+        s = radius * pi * 0.5 + (halfLength - t);
+    } else {
+        s = radius * pi * 0.5 + 2.0 * halfLength + radius * pi + (t + halfLength);
+    }
+    return 2.0 * pi * s / perimeter;
+}
+
 bool lensContains(Vec2 point, const LensSnapshot& snapshot, const LensStyle& style, double scale) noexcept {
     if (!snapshot.requestedVisible || snapshot.reveal < 0.5 || scale <= 0.0)
         return false;
@@ -36,6 +59,17 @@ bool lensContains(Vec2 point, const LensSnapshot& snapshot, const LensStyle& sty
     const double radius = effectiveLensRadius(style.radius, snapshot.reveal, wobble, motion);
     if (radius <= 0.0)
         return false;
+    // Pill: the lens is the circle swept along the core segment, so measure from the
+    // nearest point of that segment instead of the centre (identical when round).
+    const Vec2 pill = snapshot.pillAxis;
+    const double pillLength = length(pill);
+    const auto sweep = [&](Vec2 p) {
+        if (pillLength <= 1e-6)
+            return p;
+        const double t = std::clamp((p.x * pill.x + p.y * pill.y) / (pillLength * pillLength), -1.0, 1.0);
+        return Vec2{p.x - pill.x * t, p.y - pill.y * t};
+    };
+    const Vec2 swept = sweep(point);
     std::array<Vec2, 4> nodes = {};
     double trail = 0.0;
     for (std::size_t i = 1; i < nodes.size(); ++i) {
@@ -48,7 +82,7 @@ bool lensContains(Vec2 point, const LensSnapshot& snapshot, const LensStyle& sty
             node = multiply(node, maximumTrail / trail);
         trail = maximumTrail;
     }
-    if (length(point) > trail + radius * 1.40 + 2.0 / scale)
+    if (length(point) > trail + radius * 1.40 + pillLength + 2.0 / scale)
         return false;
     const Vec2 velocity = {std::clamp(snapshot.velocity.x / 1800.0, -1.0, 1.0),
                            std::clamp(snapshot.velocity.y / 1800.0, -1.0, 1.0)};
@@ -59,13 +93,13 @@ bool lensContains(Vec2 point, const LensSnapshot& snapshot, const LensStyle& sty
     if (snapshot.pinned)
         direction = multiply(snapshot.pullAxis, 1.0 / std::max(length(snapshot.pullAxis), 0.001));
     const double activation = 1.0 - std::exp(-trail / radius * 3.8);
-    double distance = length(point) - radius;
+    double distance = length(swept) - radius;
     if (snapshot.pinned) {
         const double strain = (nodes[3].x * direction.x + nodes[3].y * direction.y) / radius;
         const PinnedShape shape = pinnedShape(strain, snapshot.pullShare);
         const double stretch = interactionStretch(snapshot.interactionWobble, style, true);
-        const Vec2 local = {(point.x * direction.x + point.y * direction.y) / (radius * stretch),
-                            (-point.x * direction.y + point.y * direction.x) * stretch / radius};
+        const Vec2 local = {(swept.x * direction.x + swept.y * direction.y) / (radius * stretch),
+                            (-swept.x * direction.y + swept.y * direction.x) * stretch / radius};
         // Unit-determinant warp preserves area.
         distance = radius * pinnedDistance(local, shape) * std::min(stretch, 1.0 / stretch);
     } else if (!snapshot.pinned && activation > 0.0005) {
@@ -82,18 +116,27 @@ bool lensContains(Vec2 point, const LensSnapshot& snapshot, const LensStyle& sty
                                          (nodes[3].y - nodes[2].y) * 3.0 * t * t};
             const double materialRadius =
                 radius * std::clamp(0.22 + 0.76 / (1.0 + length(derivative) / (radius * 1.45) * 0.98), 0.22, 0.96);
-            const double drop = length(subtract(point, q)) - materialRadius;
+            // The whole pill is dragged along the trail, not just its end caps.
+            const double drop = length(sweep(subtract(point, q))) - materialRadius;
             const double blend = std::clamp(0.5 + 0.5 * (drop - slime) / (radius * 0.065), 0.0, 1.0);
             slime = drop * (1.0 - blend) + slime * blend - radius * 0.065 * blend * (1.0 - blend);
         }
         distance = distance * (1.0 - activation) + slime * activation;
     }
-    const double along = point.x * direction.x + point.y * direction.y;
-    const double across = -point.x * direction.y + point.y * direction.x;
-    const double angle = std::atan2(across, along);
+    const double along = swept.x * direction.x + swept.y * direction.y;
+    const double across = -swept.x * direction.y + swept.y * direction.x;
+    double angle = std::atan2(across, along);
+    if (pillLength > 0.5) {
+        // Angle around the whole pill outline (see pillOutlineAngle in lens_uniforms.glsl).
+        const Vec2 pillDirection = multiply(pill, 1.0 / pillLength);
+        const double pillInFlow = std::atan2(-pillDirection.x * direction.y + pillDirection.y * direction.x,
+                                             pillDirection.x * direction.x + pillDirection.y * direction.y);
+        angle = pillOutlineAngle(point, radius, pillDirection, pillLength) + pillInFlow;
+    }
+    const double travel = point.x * direction.x + point.y * direction.y;
     const double energy = std::clamp(
         std::clamp(speed * motion, 0.0, 1.18) + activation * 0.28 + std::abs(wobble) * motion * 0.34, 0.0, 1.35);
-    const double ripple = std::sin(angle * 3.0 + along / radius * 1.7 - snapshot.phase * 5.2) * 0.008 +
+    const double ripple = std::sin(angle * 3.0 + travel / radius * 1.7 - snapshot.phase * 5.2) * 0.008 +
                           std::sin(angle * 5.0 + snapshot.phase * 3.8) * 0.004;
     distance -= radius * ripple * energy;
     distance -= radius * wobble * motion * (std::cos(angle * 2.0) * 0.033 + std::sin(angle * 3.0 + 0.65) * 0.012);

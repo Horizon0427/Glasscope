@@ -9,7 +9,7 @@ void main() {
     prepareLens(motionStrength, rawSpeed, signedBounce, radius, nodes,
                 maximumTrailLength);
 
-    float conservativeOuterRadius = maximumTrailLength + radius * 1.40 + 2.0;
+    float conservativeOuterRadius = maximumTrailLength + radius * 1.40 + 2.0 + length(uPillAxis);
     if (length(pixelPoint) > conservativeOuterRadius) {
         outColor = vec4(0.0);
         return;
